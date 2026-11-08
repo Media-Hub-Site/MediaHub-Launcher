@@ -1,0 +1,60 @@
+name: CI - Pull Request Verification
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+      - launcher-modular
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Code & Build Verification
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller flake8
+          if (Test-Path requirements.txt) {
+            pip install -r requirements.txt
+          }
+
+      - name: Python Syntax & Compilation Check
+        shell: pwsh
+        run: |
+          Write-Host "Verificando sintaxis de todos los archivos Python..."
+          python -m compileall -q .
+          Write-Host "✅ Sintaxis y compilación correcta en todos los archivos."
+
+      - name: Lint Check (Critical Errors)
+        shell: pwsh
+        run: |
+          # Detiene el PR si hay errores de sintaxis, variables indefinidas o nombres rotos (E9, F63, F7, F82)
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Smoke Test (Import Verification)
+        shell: pwsh
+        run: |
+          # Verifica que el punto de entrada principal importe sin errores
+          python -c "import main; print('✅ main.py se importa limpiamente')"
+
+      - name: Dry-Run PyInstaller Spec Validation
+        shell: pwsh
+        run: |
+          if (Test-Path main.spec) {
+            Write-Host "Validando archivo de empaquetado main.spec..."
+            # Asegura que el spec compile
+            python -c "exec(open('main.spec', encoding='utf-8').read()); print('✅ main.spec es válido')"
+          }
