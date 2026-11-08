@@ -20,7 +20,7 @@ from PyQt6.QtCore import QMimeData, Qt, QSize, QThread, pyqtSignal
 
 from core.theme_manager import ThemeManager
 from core.updater import CheckUpdateThread, UpdateDialog
-from core.config import APP_REGISTRY
+from core.config import APP_REGISTRY, APP_VERSION
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -54,6 +54,8 @@ def get_apps_install_dir() -> str:
 def get_installed_versions_file() -> str:
     """Archivo JSON donde guardamos las versiones instaladas: ~/.mediahub/installed_versions.json"""
     return os.path.join(get_hub_data_dir(), "installed_versions.json")
+
+
 def load_installed_versions() -> dict:
     """Carga el diccionario {app_id: version_str} de apps instaladas."""
     fpath = get_installed_versions_file()
@@ -119,70 +121,56 @@ def launch_app(app_id: str):
     if exe and os.path.isfile(exe):
         try:
             os.startfile(exe)
-        except Exception:
-            app_dir = os.path.dirname(exe)
-            subprocess.Popen([exe], cwd=app_dir)
-def is_version_newer(current_ver: str, latest_ver: str) -> bool:
-    """
-    Compara semver básico (ej: '1.0.0' vs '1.1.0').
-    Devuelve True si latest_ver es estrictamente superior a current_ver.
-    """
-    def to_tuple(v: str):
-        v = v.lstrip("v")
-        parts = []
-        for x in v.split("."):
-            m = re.match(r"\d+", x)
-            parts.append(int(m.group(0)) if m else 0)
-        return tuple(parts)
-
-    try:
-        return to_tuple(latest_ver) > to_tuple(current_ver)
-    except Exception:
-        return latest_ver != current_ver
+        except Exception as e:
+            QMessageBox.critical(
+                None, "Error al abrir",
+                f"No se pudo iniciar la aplicación:\n{e}\n\nRuta: {exe}"
+            )
+    else:
+        QMessageBox.warning(
+            None, "No instalada",
+            "La aplicación aún no está instalada.\n"
+            "Haz clic en 'Instalar' para descargarla automáticamente."
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  Worker de consulta de versiones remotas para las micro-apps
+#  Thread verificador de actualizaciones de micro-apps
 # ─────────────────────────────────────────────────────────────────────────────
 
 class CheckMicroAppUpdatesThread(QThread):
-    """
-    Revisa en GitHub Releases la última versión de cada micro-app.
-    Emite update_found(app_id, latest_version).
-    """
-    update_found = pyqtSignal(str, str)
+    """Verifica en segundo plano si alguna app instalada tiene una versión más nueva en GitHub."""
+    update_found = pyqtSignal(str, str)  # (app_id, new_version)
 
     def run(self):
         installed = load_installed_versions()
-        for app_id, reg in APP_REGISTRY.items():
-            exe = get_app_exe(app_id)
-            if not exe:
-                continue  # Solo verificar actualizaciones para apps instaladas
-
-            current_ver = installed.get(app_id, "0.0.0")
-            repo = reg["repo"]
-            api_url = f"https://api.github.com/repos/{repo}/releases/latest"
+        for app_id, cur_v in installed.items():
+            reg = APP_REGISTRY.get(app_id)
+            if not reg:
+                continue
             try:
-                resp = requests.get(api_url, timeout=10)
+                url = f"https://api.github.com/repos/{reg['repo']}/releases/latest"
+                resp = requests.get(url, timeout=5)
                 if resp.status_code == 200:
                     data = resp.json()
                     tag = data.get("tag_name", "").lstrip("v")
-                    if tag and is_version_newer(current_ver, tag):
-                        self.update_found.emit(app_id, tag)
+                    if tag and tag != cur_v:
+                        cur_parts = [int(x) for x in cur_v.split(".") if x.isdigit()]
+                        tag_parts = [int(x) for x in tag.split(".") if x.isdigit()]
+                        if tag_parts > cur_parts:
+                            self.update_found.emit(app_id, tag)
             except Exception:
                 pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  Worker de descarga / instalación / actualización
+#  Worker de descarga e instalación
 # ─────────────────────────────────────────────────────────────────────────────
 
 class InstallWorker(QThread):
-    """Descarga el release de una micro-app desde GitHub y lo extrae."""
-
-    progress   = pyqtSignal(int, str)   # (porcentaje, texto)
-    finished   = pyqtSignal(str, str)   # (app_id, app_name)
-    error      = pyqtSignal(str)        # mensaje de error
+    progress = pyqtSignal(int, str)
+    finished = pyqtSignal(str, str)
+    error    = pyqtSignal(str)
 
     def __init__(self, app_id: str, parent=None):
         super().__init__(parent)
@@ -191,52 +179,44 @@ class InstallWorker(QThread):
     def run(self):
         reg = APP_REGISTRY.get(self.app_id)
         if not reg:
-            self.error.emit("App desconocida.")
+            self.error.emit(f"App desconocida: {self.app_id}")
             return
 
-        repo   = reg["repo"]
-        api    = f"https://api.github.com/repos/{repo}/releases/latest"
+        self.progress.emit(5, "Buscando versión más reciente en GitHub…")
+        repo = reg["repo"]
+        api_url = f"https://api.github.com/repos/{repo}/releases/latest"
 
         try:
-            self.progress.emit(5, "Consultando GitHub…")
-            resp = requests.get(api, timeout=15)
-            if resp.status_code == 404:
-                self.error.emit(
-                    f"No se encontró ninguna versión disponible para '{reg['name']}'.\n\n"
-                    "Causas posibles:\n"
-                    "1. El repositorio está en modo 'Private'. Debe ser 'Public' para que el Launcher pueda descargar las releases sin requerir un token de GitHub.\n"
-                    "2. Aún no se ha compilado ni publicado ninguna Release en GitHub Actions para esta aplicación."
-                )
-                return
-            resp.raise_for_status()
-            data = resp.json()
-            latest_tag = data.get("tag_name", "1.0.0")
+            r = requests.get(api_url, timeout=10)
+            r.raise_for_status()
+            release = r.json()
         except Exception as e:
-            self.error.emit(f"No se pudo obtener la release:\n{e}")
+            self.error.emit(f"No se pudo consultar el repositorio:\n{e}")
             return
 
-        # Buscar el asset ZIP o EXE
-        asset_url  = None
-        asset_name = None
-        for asset in data.get("assets", []):
-            name = asset["name"]
-            if name.endswith(".zip") or name.endswith(".exe"):
-                asset_url  = asset["browser_download_url"]
-                asset_name = name
-                break
+        latest_tag = release.get("tag_name", "latest")
+        assets = release.get("assets", [])
 
-        if not asset_url:
-            self.error.emit("No se encontró ningún archivo de instalación en la release.")
+        # Buscar asset .zip o .exe
+        asset = next((a for a in assets if a["name"].endswith(".zip")), None)
+        if not asset:
+            asset = next((a for a in assets if a["name"].endswith(".exe")), None)
+
+        if not asset:
+            self.error.emit(f"No se encontró instalador en el release {latest_tag}.")
             return
 
-        # Descargar
+        download_url = asset["browser_download_url"]
+        asset_name   = asset["name"]
+        total        = asset.get("size", 0)
+
+        # Descarga
         self.progress.emit(10, f"Descargando {asset_name}…")
+        tmp_file = os.path.join(tempfile.gettempdir(), asset_name)
+
         try:
-            tmp_dir  = tempfile.mkdtemp()
-            tmp_file = os.path.join(tmp_dir, asset_name)
-            with requests.get(asset_url, stream=True, timeout=60) as dl:
+            with requests.get(download_url, stream=True, timeout=30) as dl:
                 dl.raise_for_status()
-                total = int(dl.headers.get("content-length", 0))
                 downloaded = 0
                 with open(tmp_file, "wb") as f:
                     for chunk in dl.iter_content(chunk_size=65536):
@@ -244,19 +224,17 @@ class InstallWorker(QThread):
                         downloaded += len(chunk)
                         if total > 0:
                             pct = 10 + int(downloaded / total * 70)
-                            self.progress.emit(pct, f"Descargando… {downloaded // 1024} KB")
+                            self.progress.emit(pct, f"Descargando… {downloaded // (1024*1024)} MB")
         except Exception as e:
             self.error.emit(f"Error al descargar:\n{e}")
             return
 
         # Instalar / Extraer de forma 100% limpia
-        self.progress.emit(82, "Preparando e instalando archivos…")
+        self.progress.emit(85, "Instalando archivos…")
         install_base = get_apps_install_dir()
         dest_dir = os.path.join(install_base, reg["dir"])
 
         try:
-            # Si ya existía una versión anterior (reinstalación o actualización),
-            # limpiamos el directorio para evitar archivos corruptos o mezclados.
             if os.path.exists(dest_dir):
                 shutil.rmtree(dest_dir, ignore_errors=True)
             os.makedirs(dest_dir, exist_ok=True)
@@ -265,126 +243,136 @@ class InstallWorker(QThread):
                 with zipfile.ZipFile(tmp_file, "r") as zf:
                     zf.extractall(dest_dir)
             else:
-                subprocess.run([tmp_file, "/SILENT", f"/DIR={dest_dir}"],
-                               check=True)
-            # Guardar la versión instalada exitosamente
+                subprocess.run([tmp_file, "/SILENT", f"/DIR={dest_dir}"], check=True)
             save_installed_version(self.app_id, latest_tag)
         except Exception as e:
             self.error.emit(f"Error al instalar:\n{e}")
             return
 
-        self.progress.emit(100, "¡Completado con éxito!")
+        self.progress.emit(100, "¡Listo!")
         self.finished.emit(self.app_id, reg["name"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  AppCard
+#  AppCard (Bento Grid Card)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class AppCard(QFrame):
-    def __init__(self, card_id, title, subtitle, icon_file,
-                 is_disabled=False, parent=None):
+    def __init__(self, card_id, title, subtitle, icon_file, badge_text="", is_hero=False, is_disabled=False, parent=None):
         super().__init__(parent)
-        self.card_id    = card_id
+        self.card_id = card_id
+        self.is_hero = is_hero
         self._is_disabled = is_disabled
         self._pending_update_version = None
         self.setAcceptDrops(True)
 
         if is_disabled:
             self.setObjectName("appCardDisabled")
+        elif is_hero:
+            self.setObjectName("appCardHero")
         else:
             self.setObjectName("appCard")
-            shadow = QGraphicsDropShadowEffect(self)
-            shadow.setBlurRadius(15)
-            shadow.setXOffset(0)
-            shadow.setYOffset(4)
-            shadow.setColor(QColor(0, 0, 0, 80))
-            self.setGraphicsEffect(shadow)
 
-        self.setFixedHeight(180)
+        # Layout Bento Moderno
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(22, 20, 22, 20)
+        main_layout.setSpacing(12)
 
-        main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(20)
+        # Header de la tarjeta: Icono + Badge Tag
+        top_layout = QHBoxLayout()
+        top_layout.setSpacing(12)
 
-        # Icon
         self._icon_label = QLabel()
         pixmap = QPixmap(get_asset_path(icon_file))
+        icon_size = 52 if is_hero else 44
         if not pixmap.isNull():
             self._icon_label.setPixmap(
-                pixmap.scaled(100, 100,
+                pixmap.scaled(icon_size, icon_size,
                               Qt.AspectRatioMode.KeepAspectRatio,
                               Qt.TransformationMode.SmoothTransformation)
             )
-        self._icon_label.setFixedSize(100, 100)
-        self._icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self._icon_label)
+        self._icon_label.setFixedSize(icon_size, icon_size)
+        top_layout.addWidget(self._icon_label)
 
-        content_layout = QVBoxLayout()
-        content_layout.setSpacing(5)
+        if badge_text:
+            self._badge_label = QLabel(badge_text)
+            self._badge_label.setObjectName("badgeTag")
+            top_layout.addWidget(self._badge_label)
+
+        top_layout.addStretch()
+
+        # Botón secundario de opciones ⋮
+        self.options_btn = QPushButton("⋮")
+        self.options_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.options_btn.setFixedSize(30, 30)
+        self.options_btn.setToolTip("Opciones (Reinstalar / Desinstalar)")
+        self.options_btn.clicked.connect(self._show_options_menu)
+        self.options_btn.hide()
+        top_layout.addWidget(self.options_btn)
+
+        main_layout.addLayout(top_layout)
+
+        # Textos: Título y descripción
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(4)
 
         self._title_label = QLabel(title)
         self._title_label.setWordWrap(True)
         self._subtitle_label = QLabel(subtitle)
         self._subtitle_label.setWordWrap(True)
 
-        content_layout.addWidget(self._title_label)
-        content_layout.addWidget(self._subtitle_label)
-        content_layout.addStretch()
+        text_layout.addWidget(self._title_label)
+        text_layout.addWidget(self._subtitle_label)
+        main_layout.addLayout(text_layout)
 
+        main_layout.addStretch()
+
+        # Footer de la tarjeta: Estado y Botón de Acción
         action_layout = QHBoxLayout()
+        action_layout.setSpacing(10)
 
-        # Botón principal (Instalar / Abrir / Actualizar)
+        self._status_label = QLabel()
+        action_layout.addWidget(self._status_label)
+        action_layout.addStretch()
+
         self.action_btn = QPushButton()
         self.action_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         action_layout.addWidget(self.action_btn)
 
-        # Botón secundario de opciones (Reinstalar / Desinstalar)
-        self.options_btn = QPushButton("⋮")
-        self.options_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.options_btn.setFixedWidth(36)
-        self.options_btn.setToolTip("Opciones de la aplicación (Reinstalar / Desinstalar)")
-        self.options_btn.clicked.connect(self._show_options_menu)
-        self.options_btn.hide()
-        action_layout.addWidget(self.options_btn)
+        main_layout.addLayout(action_layout)
 
-        action_layout.addStretch()
-
-        # Etiqueta de estado y versión
-        self._status_label = QLabel()
-        action_layout.addWidget(self._status_label)
-
-        content_layout.addLayout(action_layout)
-        main_layout.addLayout(content_layout)
-
-        # Actualizar botón según estado instalado
         self.refresh_state()
 
     def set_update_available(self, new_version: str):
-        """Notifica a la tarjeta que hay una nueva versión disponible."""
         self._pending_update_version = new_version
         self._set_btn_state("update")
 
     def _show_options_menu(self):
-        """Despliega el menú contextual con opciones para la app instalada."""
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #252836;
-                color: #FFFFFF;
-                border: 1px solid #3B4252;
-                border-radius: 8px;
+        is_dark = ThemeManager.instance().is_dark
+        bg = "#1A1D27" if is_dark else "#FFFFFF"
+        fg = "#F3F4F6" if is_dark else "#1F2937"
+        border = "#272B3B" if is_dark else "#E5E7EB"
+        hover = "#252B3B" if is_dark else "#F3F4F6"
+
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {bg};
+                color: {fg};
+                border: 1px solid {border};
+                border-radius: 10px;
                 padding: 6px;
-            }
-            QMenu::item {
-                padding: 8px 20px;
-                border-radius: 4px;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                font-size: 9.5pt;
                 font-weight: 600;
-            }
-            QMenu::item:selected {
-                background-color: #3B5EFF;
-                color: #FFFFFF;
-            }
+            }}
+            QMenu::item {{
+                padding: 8px 18px;
+                border-radius: 6px;
+            }}
+            QMenu::item:selected {{
+                background-color: {hover};
+            }}
         """)
 
         reinstall_act = menu.addAction("🔄  Reinstalar")
@@ -396,7 +384,6 @@ class AppCard(QFrame):
         menu.exec(self.options_btn.mapToGlobal(self.options_btn.rect().bottomLeft()))
 
     def refresh_state(self):
-        """Actualiza el botón según si la app está instalada o pendiente de actualización."""
         if self._is_disabled or self.card_id not in APP_REGISTRY:
             self._set_btn_state("disabled")
             return
@@ -412,132 +399,86 @@ class AppCard(QFrame):
             self._set_btn_state("install")
 
     def _set_btn_state(self, state: str):
-        """state: 'open' | 'install' | 'update' | 'disabled'"""
         self._btn_state = state
         installed = load_installed_versions()
         cur_ver = installed.get(self.card_id)
 
         if state == "open":
-            self.action_btn.setText(" ABRIR")
-            self.action_btn.setIcon(
-                self.style().standardIcon(self.style().StandardPixmap.SP_DialogApplyButton))
+            self.action_btn.setText("Abrir")
             self.action_btn.setEnabled(True)
-            v_text = f" (v{cur_ver})" if cur_ver else ""
-            self._status_label.setText(f"✅ Instalado{v_text}")
+            v_text = f"v{cur_ver}" if cur_ver else ""
+            self._status_label.setText(f"● Listo {v_text}".strip())
             self.options_btn.show()
         elif state == "update":
-            self.action_btn.setText(" ACTUALIZAR")
-            self.action_btn.setIcon(
-                self.style().standardIcon(self.style().StandardPixmap.SP_BrowserReload))
+            self.action_btn.setText("Actualizar")
             self.action_btn.setEnabled(True)
-            self._status_label.setText(f"🚀 v{self._pending_update_version} disponible!")
+            self._status_label.setText(f"↑ v{self._pending_update_version}")
             self.options_btn.show()
         elif state == "install":
-            self.action_btn.setText(" INSTALAR")
-            self.action_btn.setIcon(
-                self.style().standardIcon(self.style().StandardPixmap.SP_ArrowDown))
+            self.action_btn.setText("Instalar")
             self.action_btn.setEnabled(True)
-            self._status_label.setText("⬇ No instalado")
+            self._status_label.setText("No instalada")
             self.options_btn.hide()
         else:
-            self.action_btn.setText(" PRÓXIMAMENTE")
+            self.action_btn.setText("Próximamente")
             self.action_btn.setEnabled(False)
             self._status_label.setText("")
             self.options_btn.hide()
 
-    # ── Drag & Drop ──────────────────────────────────────────────────────────
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.drag_start_position = event.pos()
-
-    def mouseMoveEvent(self, event):
-        if not (event.buttons() & Qt.MouseButton.LeftButton):
-            return
-        if not hasattr(self, 'drag_start_position'):
-            return
-        if (event.pos() - self.drag_start_position).manhattanLength() < 10:
-            return
-        drag = QDrag(self)
-        mime_data = QMimeData()
-        mime_data.setText(self.card_id)
-        drag.setMimeData(mime_data)
-        pixmap = self.grab()
-        drag.setPixmap(pixmap.scaled(300, 150,
-                                     Qt.AspectRatioMode.KeepAspectRatio,
-                                     Qt.TransformationMode.SmoothTransformation))
-        drag.setHotSpot(event.pos())
-        drag.exec(Qt.DropAction.MoveAction)
-
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasText() and event.source() != self:
-            event.acceptProposedAction()
-
-    def dropEvent(self, event):
-        source_id = event.mimeData().text()
-        target_id = self.card_id
-        if hasattr(self.window(), "swap_cards"):
-            self.window().swap_cards(source_id, target_id)
-        event.acceptProposedAction()
-
-    # ── Styles ───────────────────────────────────────────────────────────────
-
     def apply_styles(self, styles: dict):
         if self._is_disabled:
             self.setStyleSheet(styles["card_disabled"])
+        elif self.is_hero:
+            self.setStyleSheet(styles["card_hero"])
         else:
             self.setStyleSheet(styles["card_normal"])
-        self._title_label.setStyleSheet(styles["card_title"])
+
+        title_style = styles["card_hero_title"] if self.is_hero else styles["card_title"]
+        self._title_label.setStyleSheet(title_style)
         self._subtitle_label.setStyleSheet(styles["card_subtitle"])
-        self._status_label.setStyleSheet(styles.get("portable", ""))
-        self.options_btn.setStyleSheet(styles.get("btn_options", """
-            QPushButton {
-                background-color: #323545;
-                color: #FFFFFF;
-                border: 1px solid #45495E;
-                border-radius: 6px;
-                font-size: 14pt;
-                font-weight: bold;
-                padding: 4px;
-            }
-            QPushButton:hover {
-                background-color: #43475D;
-            }
-            QPushButton:pressed {
-                background-color: #282B38;
-            }
-        """))
+
+        if hasattr(self, "_badge_label"):
+            self._badge_label.setStyleSheet(styles["tag_badge"])
+
+        self.options_btn.setStyleSheet(styles["btn_options"])
+
         state = getattr(self, "_btn_state", "disabled")
         if state == "install":
             self.action_btn.setStyleSheet(styles["btn_install"])
+            self._status_label.setStyleSheet(styles["status_uninstalled"])
         elif state == "update":
-            self.action_btn.setStyleSheet(styles.get("btn_update", styles["btn_open"]))
+            self.action_btn.setStyleSheet(styles["btn_update"])
+            self._status_label.setStyleSheet(styles["status_update"])
         elif state == "open":
             self.action_btn.setStyleSheet(styles["btn_open"])
+            self._status_label.setStyleSheet(styles["status_installed"])
         else:
             self.action_btn.setStyleSheet(styles["btn_disabled"])
+            self._status_label.setStyleSheet(styles["status_uninstalled"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  HubWindow  —  MediaHub Launcher
+#  HubWindow  —  MediaHub Launcher (Bento Grid)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class HubWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Media Hub — Launcher")
-        self.resize(900, 800)
+        self.setWindowTitle("Media Hub")
+        # Proporción panorámica moderna 980x650
+        self.setMinimumSize(940, 620)
+        self.resize(980, 650)
         self._tm = ThemeManager.instance()
         self._workers: dict[str, InstallWorker] = {}
         self.init_ui()
         self._apply_theme()
 
-        # 1. Verificar actualizaciones del Launcher en background
+        # 1. Actualizaciones Launcher
         self.update_thread = CheckUpdateThread(self)
         self.update_thread.update_available.connect(self.show_update_dialog)
         self.update_thread.start()
 
-        # 2. Verificar actualizaciones de las Micro-Apps instaladas en background
+        # 2. Actualizaciones micro-apps
         self.micro_apps_updater = CheckMicroAppUpdatesThread(self)
         self.micro_apps_updater.update_found.connect(self._on_micro_app_update_found)
         self.micro_apps_updater.start()
@@ -551,99 +492,160 @@ class HubWindow(QMainWindow):
         if card:
             card.set_update_available(new_version)
             card.apply_styles(self._tm.hub_styles())
+        self._update_dock_status()
 
-    # ── Layout ───────────────────────────────────────────────────────────────
+    # ── UI Layout ─────────────────────────────────────────────────────────────
 
     def init_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(40, 30, 40, 40)
+        main_layout.setContentsMargins(36, 26, 36, 26)
         main_layout.setSpacing(20)
 
-        # Header
+        # Header Bento
         header_layout = QHBoxLayout()
-        self.title_label = QLabel("MEDIA HUB")
+        header_text_layout = QVBoxLayout()
+        header_text_layout.setSpacing(2)
+
+        self.title_label = QLabel("Media Hub")
         self.title_label.setObjectName("hubTitle")
-        header_layout.addWidget(self.title_label)
+        self.subtitle_label = QLabel(f"Suite integral de herramientas y conversores multimedia • {APP_VERSION}")
+        self.subtitle_label.setObjectName("hubSubtitle")
+
+        header_text_layout.addWidget(self.title_label)
+        header_text_layout.addWidget(self.subtitle_label)
+        header_layout.addLayout(header_text_layout)
         header_layout.addStretch()
 
+        # Conmutador Tema
         self.toggle_btn = QPushButton()
         self.toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.toggle_btn.setFixedHeight(38)
         self.toggle_btn.clicked.connect(self._toggle_dark_mode)
         header_layout.addWidget(self.toggle_btn)
+
         main_layout.addLayout(header_layout)
 
-        # Cards
+        # Bento Grid
         self.grid_layout = QGridLayout()
-        self.grid_layout.setSpacing(20)
+        self.grid_layout.setSpacing(16)
 
+        # 1. Hero Card: Multimedia Converter (Columna 0, fila 0, abarca 2 filas)
         self.media_card = AppCard(
-            card_id="media", title="MULTIMEDIA CONVERTER",
-            subtitle="Video, Audio, Imagen y más",
-            icon_file="media.png")
-        self.media_card.action_btn.clicked.connect(
-            lambda: self._handle_card("media"))
+            card_id="media",
+            title="Multimedia Converter",
+            subtitle="Video, Audio e Imagen con 9 herramientas profesionales integradas (Corte, GIF, Compresión, Fusión).",
+            icon_file="media.png",
+            badge_text="9 EN 1",
+            is_hero=True
+        )
+        self.media_card.action_btn.clicked.connect(lambda: self._handle_card("media"))
 
+        # 2. Document Converter (Columna 1, fila 0)
         self.docs_card = AppCard(
-            card_id="docs", title="DOCUMENT CONVERTER",
-            subtitle="PDF, Word, Excel, PowerPoint",
-            icon_file="docs.png")
-        self.docs_card.action_btn.clicked.connect(
-            lambda: self._handle_card("docs"))
+            card_id="docs",
+            title="Document Converter",
+            subtitle="Conversión inteligente entre PDF, Word, Excel, PowerPoint e imágenes a 300 DPI.",
+            icon_file="docs.png",
+            badge_text="OFICINA"
+        )
+        self.docs_card.action_btn.clicked.connect(lambda: self._handle_card("docs"))
 
-        self.image_tools_card = AppCard(
-            card_id="image_tools", title="IMAGE TOOLS",
-            subtitle="BG Eraser · Quality 4x · Watermark",
-            icon_file="quality.webp")
-        self.image_tools_card.action_btn.clicked.connect(
-            lambda: self._handle_card("image_tools"))
-
+        # 3. Link Converter (Columna 2, fila 0)
         self.link_card = AppCard(
-            card_id="link", title="LINK CONVERTER",
-            subtitle="YouTube, TikTok, Instagram & more",
-            icon_file="link_converter.webp")
-        self.link_card.action_btn.clicked.connect(
-            lambda: self._handle_card("link"))
+            card_id="link",
+            title="Link Converter",
+            subtitle="Descarga por lotes desde YouTube, TikTok, Instagram y playlists con soporte paralelo.",
+            icon_file="link_converter.webp",
+            badge_text="BATCH"
+        )
+        self.link_card.action_btn.clicked.connect(lambda: self._handle_card("link"))
 
+        # 4. Image Tools (Columna 1, fila 1)
+        self.image_tools_card = AppCard(
+            card_id="image_tools",
+            title="Image Tools",
+            subtitle="Borrador de fondos, escalador y marca de agua en lote para tus fotografías.",
+            icon_file="quality.webp",
+            badge_text="CREATIVO"
+        )
+        self.image_tools_card.action_btn.clicked.connect(lambda: self._handle_card("image_tools"))
+
+        # 5. Subtitle Generator (Columna 2, fila 1)
         self.subtitle_card = AppCard(
-            card_id="subtitle", title="SUBTITLE GENERATOR",
-            subtitle="Whisper AI — transcripción local",
-            icon_file="subtitle.png")
-        self.subtitle_card.action_btn.clicked.connect(
-            lambda: self._handle_card("subtitle"))
+            card_id="subtitle",
+            title="Subtitle Generator",
+            subtitle="Transcripción y generación automática de subtítulos con Whisper AI de forma local.",
+            icon_file="subtitle.png",
+            badge_text="IA LOCAL"
+        )
+        self.subtitle_card.action_btn.clicked.connect(lambda: self._handle_card("subtitle"))
 
         self._card_dict = {
             "media":       self.media_card,
             "docs":        self.docs_card,
-            "image_tools": self.image_tools_card,
             "link":        self.link_card,
+            "image_tools": self.image_tools_card,
             "subtitle":    self.subtitle_card,
         }
 
-        # Orden persistido
-        default_order = ["media", "docs", "image_tools", "link", "subtitle"]
-        order = default_order[:]
-        try:
-            appdata = os.environ.get('ProgramData', '')
-            path = os.path.join(appdata, "MediaHub", "settings.json")
-            with open(path, 'r') as f:
-                saved = json.load(f).get("hub_order", [])
-                if len(saved) == len(order) and all(k in self._card_dict for k in saved):
-                    order = saved
-        except Exception:
-            pass
+        # Bento layout placements:
+        # Hero card: row 0, col 0, rowSpan 2, colSpan 1
+        self.grid_layout.addWidget(self.media_card, 0, 0, 2, 1)
+        # Top right cards:
+        self.grid_layout.addWidget(self.docs_card, 0, 1)
+        self.grid_layout.addWidget(self.link_card, 0, 2)
+        # Bottom right cards:
+        self.grid_layout.addWidget(self.image_tools_card, 1, 1)
+        self.grid_layout.addWidget(self.subtitle_card, 1, 2)
 
-        self._all_cards = [self._card_dict[k] for k in order]
-        cols = 2
-        for i, card in enumerate(self._all_cards):
-            self.grid_layout.addWidget(card, i // cols, i % cols)
+        self.grid_layout.setColumnStretch(0, 11)
+        self.grid_layout.setColumnStretch(1, 10)
+        self.grid_layout.setColumnStretch(2, 10)
 
         main_layout.addLayout(self.grid_layout)
 
-    # ── Card handler (Instalar / Abrir / Actualizar) ───────────────────────────
+        # Footer Dock Bento
+        self.footer_dock = QFrame()
+        self.footer_dock.setObjectName("footerDock")
+        dock_layout = QHBoxLayout(self.footer_dock)
+        dock_layout.setContentsMargins(16, 8, 16, 8)
+
+        self.dock_status_label = QLabel("● Todas las aplicaciones están gestionadas de forma aislada")
+        self.dock_status_label.setObjectName("dockText")
+        dock_layout.addWidget(self.dock_status_label)
+        dock_layout.addStretch()
+
+        self.dock_folder_btn = QPushButton("📁 Abrir carpeta de apps")
+        self.dock_folder_btn.setObjectName("dockLink")
+        self.dock_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.dock_folder_btn.clicked.connect(self._open_apps_folder)
+        dock_layout.addWidget(self.dock_folder_btn)
+
+        main_layout.addWidget(self.footer_dock)
+        self._update_dock_status()
+
+    def _open_apps_folder(self):
+        """Abre la carpeta donde residen las micro-apps."""
+        path = get_apps_install_dir()
+        try:
+            os.startfile(path)
+        except Exception as e:
+            QMessageBox.warning(self, "Aviso", f"No se pudo abrir la carpeta:\n{e}")
+
+    def _update_dock_status(self):
+        installed = load_installed_versions()
+        count = len(installed)
+        total = len(APP_REGISTRY)
+        updates_pending = sum(1 for c in self._card_dict.values() if getattr(c, "_pending_update_version", None))
+
+        if updates_pending > 0:
+            self.dock_status_label.setText(f"🚀 Hay {updates_pending} actualización(es) disponible(s) para tus herramientas.")
+        else:
+            self.dock_status_label.setText(f"✓ {count} de {total} herramientas instaladas • Almacenamiento optimizado")
+
+    # ── Card Handler ─────────────────────────────────────────────────────────
 
     def _handle_card(self, app_id: str):
         card = self._card_dict.get(app_id)
@@ -657,7 +659,7 @@ class HubWindow(QMainWindow):
 
     def _start_install_or_update(self, app_id: str):
         if app_id in self._workers:
-            return  # ya se está descargando/instalando
+            return
 
         reg = APP_REGISTRY.get(app_id)
         if not reg:
@@ -677,7 +679,7 @@ class HubWindow(QMainWindow):
     def _on_install_progress(self, app_id: str, pct: int, msg: str):
         card = self._card_dict.get(app_id)
         if card:
-            card._status_label.setText(f"⏳ {msg}")
+            card._status_label.setText(f"⏳ {pct}%")
 
     def _on_install_done(self, app_id: str, name: str):
         self._workers.pop(app_id, None)
@@ -687,9 +689,12 @@ class HubWindow(QMainWindow):
             card.refresh_state()
             styles = self._tm.hub_styles()
             card.apply_styles(styles)
-        QMessageBox.information(self, "Operación exitosa",
-                                f"✅ {name} se ha instalado/actualizado correctamente.\n"
-                                f"Ya puedes usar la versión más reciente.")
+        self._update_dock_status()
+        QMessageBox.information(
+            self, "Operación exitosa",
+            f"✅ {name} se ha instalado/actualizado correctamente.\n"
+            f"Ya puedes usar la versión más reciente."
+        )
 
     def _on_install_error(self, app_id: str, err: str):
         self._workers.pop(app_id, None)
@@ -701,7 +706,6 @@ class HubWindow(QMainWindow):
         QMessageBox.critical(self, "Error de instalación", err)
 
     def _reinstall_app(self, app_id: str):
-        """Fuerza la reinstalación descargando nuevamente la última versión."""
         reg = APP_REGISTRY.get(app_id)
         app_name = reg["name"] if reg else app_id
         reply = QMessageBox.question(
@@ -716,7 +720,6 @@ class HubWindow(QMainWindow):
             self._start_install_or_update(app_id)
 
     def _uninstall_app(self, app_id: str):
-        """Desinstala por completo la micro-app seleccionada."""
         reg = APP_REGISTRY.get(app_id)
         if not reg:
             return
@@ -726,7 +729,7 @@ class HubWindow(QMainWindow):
             self,
             "Desinstalar aplicación",
             f"¿Estás seguro de que deseas desinstalar <b>{app_name}</b>?<br><br>"
-            "Se eliminarán los archivos locales de la aplicación y volverá al estado 'No instalado'.",
+            "Se eliminarán los archivos locales de la aplicación y volverá al estado 'No instalada'.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )
@@ -745,6 +748,7 @@ class HubWindow(QMainWindow):
                 card._pending_update_version = None
                 card.refresh_state()
                 card.apply_styles(self._tm.hub_styles())
+            self._update_dock_status()
             QMessageBox.information(
                 self,
                 "Desinstalación completa",
@@ -758,29 +762,6 @@ class HubWindow(QMainWindow):
                 "Asegúrate de que la aplicación no esté abierta en segundo plano."
             )
 
-    # ── Drag & Drop ──────────────────────────────────────────────────────────
-
-    def swap_cards(self, id1, id2):
-        idx1 = next(i for i, c in enumerate(self._all_cards) if c.card_id == id1)
-        idx2 = next(i for i, c in enumerate(self._all_cards) if c.card_id == id2)
-        self._all_cards[idx1], self._all_cards[idx2] = \
-            self._all_cards[idx2], self._all_cards[idx1]
-        for card in self._all_cards:
-            self.grid_layout.removeWidget(card)
-        cols = 2
-        for i, card in enumerate(self._all_cards):
-            self.grid_layout.addWidget(card, i // cols, i % cols)
-        self.save_layout()
-
-    def save_layout(self):
-        order = [c.card_id for c in self._all_cards]
-        appdata = os.environ.get('ProgramData', '')
-        if appdata:
-            path = os.path.join(appdata, "MediaHub", "settings.json")
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, 'w') as f:
-                json.dump({"hub_order": order}, f)
-
     # ── Theme ─────────────────────────────────────────────────────────────────
 
     def _toggle_dark_mode(self):
@@ -791,8 +772,11 @@ class HubWindow(QMainWindow):
         styles = self._tm.hub_styles()
         self.setStyleSheet(styles["window"])
         self.title_label.setStyleSheet(styles["title"])
+        self.subtitle_label.setStyleSheet(styles["header_sub"])
         self.toggle_btn.setStyleSheet(styles["toggle_btn"])
         self.toggle_btn.setText(
             "☀️  Modo Claro" if self._tm.is_dark else "🌙  Modo Oscuro")
-        for card in self._all_cards:
+        self.footer_dock.setStyleSheet(styles["dock"])
+
+        for card in self._card_dict.values():
             card.apply_styles(styles)

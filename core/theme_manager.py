@@ -3,13 +3,7 @@ core/theme_manager.py
 ─────────────────────
 Singleton that stores the current dark/light preference and provides
 ready-to-use style strings for every part of the app.
-
-Usage anywhere:
-    from core.theme_manager import ThemeManager
-    tm = ThemeManager.instance()
-    is_dark = tm.is_dark
-    styles  = tm.styles()      # dict of QSS strings (hub styles)
-    colors  = tm.app_colors()  # dict of color tokens (micro-app styles)
+Refined Bento-Grid aesthetic (Apple / Windows 11 Fluent inspired).
 """
 
 from __future__ import annotations
@@ -20,79 +14,117 @@ from __future__ import annotations
 # ──────────────────────────────────────────────────────────────────────────────
 
 _APP_COLORS_LIGHT = {
-    "bg":           "#FAF7F4",
+    "bg":           "#F8F9FA",
     "card":         "#FFFFFF",
-    "text_main":    "#4B362D",
-    "text_muted":   "#7A5A49",
-    "border":       "#E9D8CD",
-    "accent":       "#E7BFA7",
-    "accent_hover": "#DFAE90",
-    "accent_soft":  "#F8EEE8",
-    "drop_bg":      "#FCF6F1",
+    "text_main":    "#111827",
+    "text_muted":   "#6B7280",
+    "border":       "#E5E7EB",
+    "accent":       "#2563EB",
+    "accent_hover": "#1D4ED8",
+    "accent_soft":  "#EFF6FF",
+    "drop_bg":      "#F9FAFB",
 }
 
 _APP_COLORS_DARK = {
-    "bg":           "#141420",
-    "card":         "#1E1E2E",
-    "text_main":    "#E4E0DC",
-    "text_muted":   "#9898B8",
-    "border":       "#2E2E45",
-    "accent":       "#6C63FF",
-    "accent_hover": "#7C73FF",
-    "accent_soft":  "#252535",
-    "drop_bg":      "#1A1A2A",
+    "bg":           "#0D0E12",
+    "card":         "#15171E",
+    "text_main":    "#F3F4F6",
+    "text_muted":   "#9CA3AF",
+    "border":       "#262A36",
+    "accent":       "#3B82F6",
+    "accent_hover": "#60A5FA",
+    "accent_soft":  "#1E2433",
+    "drop_bg":      "#12141A",
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Hub-level palettes (used by hub_theme.py)
+#  Hub-level palettes (Bento Grid Apple / Win11 Modern)
 # ──────────────────────────────────────────────────────────────────────────────
 
 _HUB_LIGHT = {
-    "window_bg":        "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0B1D3A, stop:1 #133D7A)",
-    "card_bg":          "#F8F9FB",
-    "card_disabled_bg": "#D3D8DE",
-    "card_title":       "#1A1A1A",
-    "card_subtitle":    "#555555",
-    "portable_label":   "#888888",
-    "toggle_bg":        "rgba(255,255,255,0.15)",
-    "toggle_bg_hover":  "rgba(255,255,255,0.28)",
-    "toggle_border":    "rgba(255,255,255,0.35)",
-    "toggle_color":     "#FFFFFF",
-    "btn_open_bg":      "#0069D9",
-    "btn_open_hover":   "#007BFF",
-    "btn_open_press":   "#0062CC",
-    "btn_install_bg":   "#218838",
-    "btn_install_hover":"#28A745",
-    "btn_install_press":"#1E7E34",
-    "btn_update_bg":    "#E67E22",
-    "btn_update_hover":  "#F39C12",
-    "btn_update_press":  "#D35400",
-    "btn_disabled_bg":  "#A0A5AA",
-    "btn_disabled_fg":  "#444444",
+    "window_bg":        "#F3F4F6",
+    "card_bg":          "#FFFFFF",
+    "card_border":      "#E5E7EB",
+    "card_border_hover":"#D1D5DB",
+    "card_disabled_bg": "#F9FAFB",
+    "card_disabled_border": "#E5E7EB",
+    "card_title":       "#111827",
+    "card_subtitle":    "#4B5563",
+    "tag_bg":           "#F3F4F6",
+    "tag_fg":           "#4B5563",
+    "status_installed": "#059669",
+    "status_available": "#2563EB",
+    "status_uninstalled":"#6B7280",
+    "status_update":    "#D97706",
+    "toggle_bg":        "#FFFFFF",
+    "toggle_bg_hover":  "#F9FAFB",
+    "toggle_border":    "#E5E7EB",
+    "toggle_color":     "#1F2937",
+    "header_sub":       "#6B7280",
+    "dock_bg":          "#FFFFFF",
+    "dock_border":      "#E5E7EB",
+    "dock_text":        "#374151",
+    "btn_open_bg":      "#18181B",
+    "btn_open_fg":      "#FFFFFF",
+    "btn_open_hover":   "#27272A",
+    "btn_open_press":   "#09090B",
+    "btn_install_bg":   "#2563EB",
+    "btn_install_fg":   "#FFFFFF",
+    "btn_install_hover":"#1D4ED8",
+    "btn_install_press":"#1E40AF",
+    "btn_update_bg":    "#EA580C",
+    "btn_update_fg":    "#FFFFFF",
+    "btn_update_hover": "#C2410C",
+    "btn_update_press": "#9A3412",
+    "btn_disabled_bg":  "#F3F4F6",
+    "btn_disabled_fg":  "#9CA3AF",
+    "options_bg":       "#F3F4F6",
+    "options_fg":       "#374151",
+    "options_border":   "#E5E7EB",
+    "options_hover":    "#E5E7EB",
 }
 
 _HUB_DARK = {
-    "window_bg":        "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0A0A0F, stop:1 #12121E)",
-    "card_bg":          "#1E1E2E",
-    "card_disabled_bg": "#2A2A3A",
-    "card_title":       "#E8E8F0",
-    "card_subtitle":    "#9090A8",
-    "portable_label":   "#6060A0",
-    "toggle_bg":        "rgba(255,220,80,0.15)",
-    "toggle_bg_hover":  "rgba(255,220,80,0.28)",
-    "toggle_border":    "rgba(255,220,80,0.45)",
-    "toggle_color":     "#FFE066",
-    "btn_open_bg":      "#3B5EFF",
-    "btn_open_hover":   "#5577FF",
-    "btn_open_press":   "#2244EE",
-    "btn_install_bg":   "#1A6B3A",
-    "btn_install_hover":"#22884A",
-    "btn_install_press":"#145230",
-    "btn_update_bg":    "#D35400",
-    "btn_update_hover":  "#E67E22",
-    "btn_update_press":  "#BA4A00",
-    "btn_disabled_bg":  "#2E2E3E",
-    "btn_disabled_fg":  "#666680",
+    "window_bg":        "#0B0C10",
+    "card_bg":          "#14161D",
+    "card_border":      "#202430",
+    "card_border_hover":"#32384A",
+    "card_disabled_bg": "#101117",
+    "card_disabled_border": "#1A1D27",
+    "card_title":       "#F9FAFB",
+    "card_subtitle":    "#9CA3AF",
+    "tag_bg":           "#1C202C",
+    "tag_fg":           "#94A3B8",
+    "status_installed": "#10B981",
+    "status_available": "#60A5FA",
+    "status_uninstalled":"#6B7280",
+    "status_update":    "#F59E0B",
+    "toggle_bg":        "#151720",
+    "toggle_bg_hover":  "#1E212D",
+    "toggle_border":    "#272B3B",
+    "toggle_color":     "#E5E7EB",
+    "header_sub":       "#828B9E",
+    "dock_bg":          "#12141B",
+    "dock_border":      "#1E222D",
+    "dock_text":        "#9CA3AF",
+    "btn_open_bg":      "#F4F4F5",
+    "btn_open_fg":      "#09090B",
+    "btn_open_hover":   "#E4E4E7",
+    "btn_open_press":   "#D4D4D8",
+    "btn_install_bg":   "#3B82F6",
+    "btn_install_fg":   "#FFFFFF",
+    "btn_install_hover":"#2563EB",
+    "btn_install_press":"#1D4ED8",
+    "btn_update_bg":    "#F97316",
+    "btn_update_fg":    "#FFFFFF",
+    "btn_update_hover": "#EA580C",
+    "btn_update_press": "#C2410C",
+    "btn_disabled_bg":  "#1B1D27",
+    "btn_disabled_fg":  "#4B5563",
+    "options_bg":       "#1A1D27",
+    "options_fg":       "#E2E8F0",
+    "options_border":   "#272B3B",
+    "options_hover":    "#2B3042",
 }
 
 
@@ -100,9 +132,9 @@ _HUB_DARK = {
 #  Style generators
 # ──────────────────────────────────────────────────────────────────────────────
 
-RADIUS_LG = 18
+RADIUS_LG = 16
 RADIUS_MD = 12
-RADIUS_SM = 10
+RADIUS_SM = 8
 
 
 def _build_app_styles(c: dict) -> dict:
@@ -112,7 +144,7 @@ def _build_app_styles(c: dict) -> dict:
         QWidget {{
             background-color: {c["bg"]};
             color: {c["text_main"]};
-            font-family: "Segoe UI", "Inter", sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
         }}
         QLabel {{
             background: transparent;
@@ -156,8 +188,8 @@ def _build_app_styles(c: dict) -> dict:
     """
 
     button = (
-        f"QPushButton{{background:{c['accent']};color:{c['text_main']};"
-        f"padding:10px 12px;border-radius:{RADIUS_MD}px;border:1px solid {c['border']};font-weight:600;}}"
+        f"QPushButton{{background:{c['accent']};color:#FFFFFF;"
+        f"padding:10px 14px;border-radius:{RADIUS_SM}px;border:none;font-weight:600;}}"
         f"QPushButton:hover{{background:{c['accent_hover']};}}"
         f"QPushButton:pressed{{background:{c['accent']};}}"
         f"QPushButton:disabled{{background:{c['accent_soft']};color:{c['text_muted']};}}"
@@ -165,40 +197,40 @@ def _build_app_styles(c: dict) -> dict:
 
     soft_button = (
         f"QPushButton{{background:{c['accent_soft']};color:{c['text_main']};"
-        f"padding:8px 10px;border-radius:{RADIUS_MD}px;border:1px solid {c['border']};font-weight:600;}}"
-        f"QPushButton:hover{{background:{c['accent_soft']};}}"
-        f"QPushButton:pressed{{background:{c['card']};}}"
+        f"padding:8px 12px;border-radius:{RADIUS_SM}px;border:1px solid {c['border']};font-weight:600;}}"
+        f"QPushButton:hover{{background:{c['card']};}}"
+        f"QPushButton:pressed{{background:{c['accent_soft']};}}"
     )
 
     remove_button = (
-        f"QPushButton{{background:#FF684D;color:#FFFFFF;"
-        f"padding:10px 12px;border-radius:{RADIUS_MD}px;border:1px solid #D0553F;font-weight:600;}}"
-        f"QPushButton:hover{{background:#FF856E;}}"
-        f"QPushButton:pressed{{background:#E05A42;}}"
-        f"QPushButton:disabled{{background:{c['accent_soft']};color:{c['text_muted']};border:1px solid {c['border']};}}"
+        f"QPushButton{{background:#EF4444;color:#FFFFFF;"
+        f"padding:10px 14px;border-radius:{RADIUS_SM}px;border:none;font-weight:600;}}"
+        f"QPushButton:hover{{background:#DC2626;}}"
+        f"QPushButton:pressed{{background:#B91C1C;}}"
+        f"QPushButton:disabled{{background:{c['accent_soft']};color:{c['text_muted']};}}"
     )
 
     convert_button = (
-        f"QPushButton{{background:#2ECC71;color:#0D3320;"
-        f"padding:10px 12px;border-radius:{RADIUS_MD}px;border:1px solid #27AE60;font-weight:600;}}"
-        f"QPushButton:hover{{background:#3DDA80;}}"
-        f"QPushButton:pressed{{background:#25A35A;}}"
-        f"QPushButton:disabled{{background:{c['accent_soft']};color:{c['text_muted']};border:1px solid {c['border']};}}"
+        f"QPushButton{{background:#10B981;color:#FFFFFF;"
+        f"padding:10px 14px;border-radius:{RADIUS_SM}px;border:none;font-weight:600;}}"
+        f"QPushButton:hover{{background:#059669;}}"
+        f"QPushButton:pressed{{background:#047857;}}"
+        f"QPushButton:disabled{{background:{c['accent_soft']};color:{c['text_muted']};}}"
     )
 
     ffmpeg_button = (
-        f"QPushButton{{background:#D0553F;color:#FFFFFF;"
-        f"padding:8px 10px;border-radius:{RADIUS_MD}px;border:1px solid #A8412D;font-weight:600;}}"
-        f"QPushButton:hover{{background:#E0644D;}}"
-        f"QPushButton:pressed{{background:#B54632;}}"
+        f"QPushButton{{background:#EF4444;color:#FFFFFF;"
+        f"padding:8px 12px;border-radius:{RADIUS_SM}px;border:none;font-weight:600;}}"
+        f"QPushButton:hover{{background:#DC2626;}}"
+        f"QPushButton:pressed{{background:#B91C1C;}}"
     )
 
     combo = (
-        f"QComboBox{{background:{c['card']};border:1px solid {c['border']};padding:6px;"
-        f"border-radius:{RADIUS_SM}px;color:{c['text_main']};min-height:18px;}}"
+        f"QComboBox{{background:{c['card']};border:1px solid {c['border']};padding:6px 10px;"
+        f"border-radius:{RADIUS_SM}px;color:{c['text_main']};min-height:22px;}}"
         f"QComboBox:hover{{border:1px solid {c['accent']};}}"
         f"QComboBox:focus{{border:1px solid {c['accent']};}}"
-        f"QComboBox::drop-down{{border:none;padding-right:6px;}}"
+        f"QComboBox::drop-down{{border:none;padding-right:8px;}}"
         f"QComboBox QAbstractItemView{{background:{c['card']};border:1px solid {c['border']};"
         f"selection-background-color:{c['accent_soft']};selection-color:{c['text_main']};}}"
     )
@@ -207,20 +239,19 @@ def _build_app_styles(c: dict) -> dict:
         f"background: {c['drop_bg']};"
         f"border: 2px dashed {c['border']};"
         f"color: {c['text_muted']};"
-        "padding: 12px;"
+        "padding: 14px;"
         f"border-radius: {RADIUS_MD}px;"
     )
 
-    # Document-converter inner button style
     doc_btn = f"""
         QPushButton {{
             background-color: {c['card']};
             border: 1px solid {c['border']};
-            border-radius: 8px;
+            border-radius: {RADIUS_SM}px;
             padding: 12px 20px;
             text-align: left;
             font-size: 11pt;
-            font-weight: bold;
+            font-weight: 600;
             color: {c['text_main']};
         }}
         QPushButton:hover {{
@@ -247,43 +278,116 @@ def _build_app_styles(c: dict) -> dict:
 
 
 def _build_hub_styles(h: dict) -> dict:
-    """Build hub QSS strings from a hub color dict `h`."""
+    """Build modern Bento-Grid hub QSS strings from a hub color dict `h`."""
 
-    window = f"QMainWindow {{ background: {h['window_bg']}; }}"
-
-    title = """
-        QLabel#hubTitle {
-            color: white;
-            font-size: 24pt;
-            font-weight: bold;
-            font-family: "Segoe UI", "Arial", sans-serif;
-        }
+    window = f"""
+        QMainWindow {{
+            background-color: {h['window_bg']};
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+        }}
     """
 
-    card_normal = f"QFrame#appCard {{ background-color: {h['card_bg']}; border-radius: 12px; }}"
-    card_disabled = f"QFrame#appCardDisabled {{ background-color: {h['card_disabled_bg']}; border-radius: 12px; }}"
+    title = f"""
+        QLabel#hubTitle {{
+            color: {h['card_title']};
+            font-size: 21pt;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }}
+    """
+
+    header_sub = f"""
+        QLabel#hubSubtitle {{
+            color: {h['header_sub']};
+            font-size: 10.5pt;
+            font-weight: 500;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }}
+    """
+
+    card_normal = f"""
+        QFrame#appCard {{
+            background-color: {h['card_bg']};
+            border: 1px solid {h['card_border']};
+            border-radius: 16px;
+        }}
+        QFrame#appCard:hover {{
+            border: 1px solid {h['card_border_hover']};
+        }}
+    """
+
+    card_hero = f"""
+        QFrame#appCardHero {{
+            background-color: {h['card_bg']};
+            border: 1px solid {h['card_border']};
+            border-radius: 16px;
+        }}
+        QFrame#appCardHero:hover {{
+            border: 1px solid {h['card_border_hover']};
+        }}
+    """
+
+    card_disabled = f"""
+        QFrame#appCardDisabled {{
+            background-color: {h['card_disabled_bg']};
+            border: 1px solid {h['card_disabled_border']};
+            border-radius: 16px;
+        }}
+    """
 
     card_title = f"""
         QLabel {{
             color: {h['card_title']};
-            font-size: 16pt;
-            font-weight: 900;
-            font-family: "Segoe UI", "Arial", sans-serif;
+            font-size: 13pt;
+            font-weight: 700;
+            letter-spacing: -0.2px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }}
+    """
+
+    card_hero_title = f"""
+        QLabel {{
+            color: {h['card_title']};
+            font-size: 15pt;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }}
     """
 
     card_subtitle = f"""
         QLabel {{
             color: {h['card_subtitle']};
-            font-size: 10pt;
-            font-family: "Segoe UI", "Arial", sans-serif;
+            font-size: 9.5pt;
+            font-weight: 400;
+            line-height: 1.3;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }}
+    """
+
+    tag_badge = f"""
+        QLabel {{
+            background-color: {h['tag_bg']};
+            color: {h['tag_fg']};
+            border-radius: 6px;
+            padding: 3px 8px;
+            font-size: 8.5pt;
+            font-weight: 600;
+            letter-spacing: 0.3px;
         }}
     """
 
     btn_install = f"""
         QPushButton {{
-            background-color: {h['btn_install_bg']}; color: white; border: none;
-            border-radius: 6px; padding: 8px 16px; font-weight: bold; font-size: 11pt;
+            background-color: {h['btn_install_bg']};
+            color: {h['btn_install_fg']};
+            border: none;
+            border-radius: 9px;
+            padding: 8px 18px;
+            font-weight: 700;
+            font-size: 10pt;
+            letter-spacing: 0.2px;
         }}
         QPushButton:hover  {{ background-color: {h['btn_install_hover']}; }}
         QPushButton:pressed {{ background-color: {h['btn_install_press']}; }}
@@ -291,8 +395,14 @@ def _build_hub_styles(h: dict) -> dict:
 
     btn_open = f"""
         QPushButton {{
-            background-color: {h['btn_open_bg']}; color: white; border: none;
-            border-radius: 6px; padding: 8px 16px; font-weight: bold; font-size: 11pt;
+            background-color: {h['btn_open_bg']};
+            color: {h['btn_open_fg']};
+            border: none;
+            border-radius: 9px;
+            padding: 8px 18px;
+            font-weight: 700;
+            font-size: 10pt;
+            letter-spacing: 0.2px;
         }}
         QPushButton:hover  {{ background-color: {h['btn_open_hover']}; }}
         QPushButton:pressed {{ background-color: {h['btn_open_press']}; }}
@@ -300,8 +410,14 @@ def _build_hub_styles(h: dict) -> dict:
 
     btn_update = f"""
         QPushButton {{
-            background-color: {h['btn_update_bg']}; color: white; border: none;
-            border-radius: 6px; padding: 8px 16px; font-weight: bold; font-size: 11pt;
+            background-color: {h['btn_update_bg']};
+            color: {h['btn_update_fg']};
+            border: none;
+            border-radius: 9px;
+            padding: 8px 18px;
+            font-weight: 700;
+            font-size: 10pt;
+            letter-spacing: 0.2px;
         }}
         QPushButton:hover  {{ background-color: {h['btn_update_hover']}; }}
         QPushButton:pressed {{ background-color: {h['btn_update_press']}; }}
@@ -309,40 +425,96 @@ def _build_hub_styles(h: dict) -> dict:
 
     btn_disabled = f"""
         QPushButton {{
-            background-color: {h['btn_disabled_bg']}; color: {h['btn_disabled_fg']}; border: none;
-            border-radius: 6px; padding: 8px 16px; font-weight: bold; font-size: 11pt;
+            background-color: {h['btn_disabled_bg']};
+            color: {h['btn_disabled_fg']};
+            border: none;
+            border-radius: 9px;
+            padding: 8px 18px;
+            font-weight: 600;
+            font-size: 10pt;
         }}
     """
 
-    portable = f"QLabel {{ color: {h['portable_label']}; font-weight: bold; font-size: 10pt; }}"
+    btn_options = f"""
+        QPushButton {{
+            background-color: {h['options_bg']};
+            color: {h['options_fg']};
+            border: 1px solid {h['options_border']};
+            border-radius: 8px;
+            font-size: 12pt;
+            font-weight: bold;
+            padding: 2px;
+        }}
+        QPushButton:hover {{
+            background-color: {h['options_hover']};
+        }}
+    """
+
+    status_installed = f"QLabel {{ color: {h['status_installed']}; font-weight: 600; font-size: 9pt; }}"
+    status_available = f"QLabel {{ color: {h['status_available']}; font-weight: 600; font-size: 9pt; }}"
+    status_uninstalled = f"QLabel {{ color: {h['status_uninstalled']}; font-weight: 500; font-size: 9pt; }}"
+    status_update = f"QLabel {{ color: {h['status_update']}; font-weight: 700; font-size: 9pt; }}"
 
     toggle = f"""
         QPushButton {{
             background-color: {h['toggle_bg']};
             color: {h['toggle_color']};
-            border: 1.5px solid {h['toggle_border']};
-            border-radius: 18px;
-            padding: 6px 18px;
-            font-size: 13pt;
-            font-weight: bold;
+            border: 1px solid {h['toggle_border']};
+            border-radius: 12px;
+            padding: 6px 14px;
+            font-size: 10pt;
+            font-weight: 600;
         }}
         QPushButton:hover  {{ background-color: {h['toggle_bg_hover']}; }}
-        QPushButton:pressed {{ background-color: {h['toggle_bg']}; }}
+    """
+
+    dock = f"""
+        QFrame#footerDock {{
+            background-color: {h['dock_bg']};
+            border: 1px solid {h['dock_border']};
+            border-radius: 12px;
+            padding: 4px 16px;
+        }}
+        QLabel#dockText {{
+            color: {h['dock_text']};
+            font-size: 9pt;
+            font-weight: 500;
+        }}
+        QPushButton#dockLink {{
+            background: transparent;
+            color: {h['btn_install_bg']};
+            border: none;
+            font-size: 9pt;
+            font-weight: 600;
+            padding: 4px 8px;
+        }}
+        QPushButton#dockLink:hover {{
+            text-decoration: underline;
+        }}
     """
 
     return {
-        "window":       window,
-        "title":        title,
-        "card_normal":  card_normal,
-        "card_disabled":card_disabled,
-        "card_title":   card_title,
-        "card_subtitle":card_subtitle,
-        "btn_install":  btn_install,
-        "btn_open":     btn_open,
-        "btn_update":   btn_update,
-        "btn_disabled": btn_disabled,
-        "portable":     portable,
-        "toggle_btn":   toggle,
+        "window":           window,
+        "title":            title,
+        "header_sub":       header_sub,
+        "card_normal":      card_normal,
+        "card_hero":        card_hero,
+        "card_disabled":    card_disabled,
+        "card_title":       card_title,
+        "card_hero_title":  card_hero_title,
+        "card_subtitle":    card_subtitle,
+        "tag_badge":        tag_badge,
+        "btn_install":      btn_install,
+        "btn_open":         btn_open,
+        "btn_update":       btn_update,
+        "btn_disabled":     btn_disabled,
+        "btn_options":      btn_options,
+        "status_installed": status_installed,
+        "status_available": status_available,
+        "status_uninstalled": status_uninstalled,
+        "status_update":    status_update,
+        "toggle_btn":       toggle,
+        "dock":             dock,
     }
 
 
@@ -354,7 +526,8 @@ class ThemeManager:
     _inst: "ThemeManager | None" = None
 
     def __init__(self):
-        self._dark = False
+        # Default a modo oscuro por coherencia visual pro
+        self._dark = True
 
     @classmethod
     def instance(cls) -> "ThemeManager":
