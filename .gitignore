@@ -46,7 +46,7 @@ tmp_test/
 *.log
 *.tmp
 
-*.iss
+# *.iss
 *.spec
 *.exe
 /Instalador/
