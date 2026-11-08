@@ -23,6 +23,29 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
+      - name: Generate Release Tag Name and version.json
+        id: tag_name
+        shell: pwsh
+        run: |
+          if ("${{ github.ref }}" -match "refs/tags/") {
+            $raw_tag = "${{ github.ref_name }}"
+          } else {
+            $date = Get-Date -Format "yyyyMMdd-HHmm"
+            $raw_tag = "v$date"
+          }
+          $clean_ver = $raw_tag.TrimStart('v')
+          @{ version = $clean_ver } | ConvertTo-Json | Set-Content -Path "version.json" -Encoding utf8
+          Write-Host "Injected version.json: $clean_ver (Tag: $raw_tag)"
+          echo "TAG=$raw_tag" >> $env:GITHUB_OUTPUT
+          echo "CLEAN_VERSION=$clean_ver" >> $env:GITHUB_OUTPUT
+
+      - name: Update Inno Setup AppVersion
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.tag_name.outputs.CLEAN_VERSION }}"
+          (Get-Content Media-Hub.iss) -replace 'AppVersion=.*', "AppVersion=$ver" | Set-Content Media-Hub.iss
+          Write-Host "Updated Media-Hub.iss AppVersion to $ver"
+
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
@@ -36,16 +59,6 @@ jobs:
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
         with:
           path: Media-Hub.iss
-
-      - name: Generate Release Tag Name
-        id: tag_name
-        run: |
-          if ("${{ github.ref }}" -match "refs/tags/") {
-            echo "TAG=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
-          } else {
-            $date = Get-Date -Format "yyyyMMdd-HHmm"
-            echo "TAG=v$date" >> $env:GITHUB_OUTPUT
-          }
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

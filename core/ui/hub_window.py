@@ -20,7 +20,7 @@ from PyQt6.QtCore import QMimeData, Qt, QSize, QThread, pyqtSignal
 
 from core.theme_manager import ThemeManager
 from core.updater import CheckUpdateThread, UpdateDialog
-from core.config import APP_REGISTRY, APP_VERSION
+from core.config import APP_REGISTRY, get_launcher_version, save_launcher_version
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -197,7 +197,6 @@ class InstallWorker(QThread):
         latest_tag = release.get("tag_name", "latest")
         assets = release.get("assets", [])
 
-        # Buscar asset .zip o .exe
         asset = next((a for a in assets if a["name"].endswith(".zip")), None)
         if not asset:
             asset = next((a for a in assets if a["name"].endswith(".exe")), None)
@@ -210,7 +209,6 @@ class InstallWorker(QThread):
         asset_name   = asset["name"]
         total        = asset.get("size", 0)
 
-        # Descarga
         self.progress.emit(10, f"Descargando {asset_name}…")
         tmp_file = os.path.join(tempfile.gettempdir(), asset_name)
 
@@ -229,7 +227,6 @@ class InstallWorker(QThread):
             self.error.emit(f"Error al descargar:\n{e}")
             return
 
-        # Instalar / Extraer de forma 100% limpia
         self.progress.emit(85, "Instalando archivos…")
         install_base = get_apps_install_dir()
         dest_dir = os.path.join(install_base, reg["dir"])
@@ -273,12 +270,10 @@ class AppCard(QFrame):
         else:
             self.setObjectName("appCard")
 
-        # Layout Bento Moderno
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(22, 20, 22, 20)
         main_layout.setSpacing(12)
 
-        # Header de la tarjeta: Icono + Badge Tag
         top_layout = QHBoxLayout()
         top_layout.setSpacing(12)
 
@@ -301,7 +296,6 @@ class AppCard(QFrame):
 
         top_layout.addStretch()
 
-        # Botón secundario de opciones ⋮
         self.options_btn = QPushButton("⋮")
         self.options_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.options_btn.setFixedSize(30, 30)
@@ -312,7 +306,6 @@ class AppCard(QFrame):
 
         main_layout.addLayout(top_layout)
 
-        # Textos: Título y descripción
         text_layout = QVBoxLayout()
         text_layout.setSpacing(4)
 
@@ -327,7 +320,6 @@ class AppCard(QFrame):
 
         main_layout.addStretch()
 
-        # Footer de la tarjeta: Estado y Botón de Acción
         action_layout = QHBoxLayout()
         action_layout.setSpacing(10)
 
@@ -465,7 +457,6 @@ class HubWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Media Hub")
-        # Proporción panorámica moderna 980x650
         self.setMinimumSize(940, 620)
         self.resize(980, 650)
         self._tm = ThemeManager.instance()
@@ -476,6 +467,7 @@ class HubWindow(QMainWindow):
         # 1. Actualizaciones Launcher
         self.update_thread = CheckUpdateThread(self)
         self.update_thread.update_available.connect(self.show_update_dialog)
+        self.update_thread.latest_version_detected.connect(self._on_launcher_version_detected)
         self.update_thread.start()
 
         # 2. Actualizaciones micro-apps
@@ -486,6 +478,11 @@ class HubWindow(QMainWindow):
     def show_update_dialog(self, version, description, download_url, size_mb):
         dialog = UpdateDialog(version, description, download_url, size_mb, self)
         dialog.exec()
+
+    def _on_launcher_version_detected(self, latest_ver: str):
+        # Si la versión local es menor o coincide, actualizamos el header
+        curr = get_launcher_version()
+        self.subtitle_label.setText(f"Suite integral de herramientas y conversores multimedia • {curr}")
 
     def _on_micro_app_update_found(self, app_id: str, new_version: str):
         card = self._card_dict.get(app_id)
@@ -509,9 +506,10 @@ class HubWindow(QMainWindow):
         header_text_layout = QVBoxLayout()
         header_text_layout.setSpacing(2)
 
+        current_ver = get_launcher_version()
         self.title_label = QLabel("Media Hub")
         self.title_label.setObjectName("hubTitle")
-        self.subtitle_label = QLabel(f"Suite integral de herramientas y conversores multimedia • {APP_VERSION}")
+        self.subtitle_label = QLabel(f"Suite integral de herramientas y conversores multimedia • {current_ver}")
         self.subtitle_label.setObjectName("hubSubtitle")
 
         header_text_layout.addWidget(self.title_label)
@@ -519,7 +517,6 @@ class HubWindow(QMainWindow):
         header_layout.addLayout(header_text_layout)
         header_layout.addStretch()
 
-        # Conmutador Tema
         self.toggle_btn = QPushButton()
         self.toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.toggle_btn.clicked.connect(self._toggle_dark_mode)
@@ -531,7 +528,7 @@ class HubWindow(QMainWindow):
         self.grid_layout = QGridLayout()
         self.grid_layout.setSpacing(16)
 
-        # 1. Hero Card: Multimedia Converter (Columna 0, fila 0, abarca 2 filas)
+        # 1. Hero Card: Multimedia Converter
         self.media_card = AppCard(
             card_id="media",
             title="Multimedia Converter",
@@ -542,7 +539,7 @@ class HubWindow(QMainWindow):
         )
         self.media_card.action_btn.clicked.connect(lambda: self._handle_card("media"))
 
-        # 2. Document Converter (Columna 1, fila 0)
+        # 2. Document Converter
         self.docs_card = AppCard(
             card_id="docs",
             title="Document Converter",
@@ -552,7 +549,7 @@ class HubWindow(QMainWindow):
         )
         self.docs_card.action_btn.clicked.connect(lambda: self._handle_card("docs"))
 
-        # 3. Link Converter (Columna 2, fila 0)
+        # 3. Link Converter
         self.link_card = AppCard(
             card_id="link",
             title="Link Converter",
@@ -562,7 +559,7 @@ class HubWindow(QMainWindow):
         )
         self.link_card.action_btn.clicked.connect(lambda: self._handle_card("link"))
 
-        # 4. Image Tools (Columna 1, fila 1)
+        # 4. Image Tools
         self.image_tools_card = AppCard(
             card_id="image_tools",
             title="Image Tools",
@@ -572,7 +569,7 @@ class HubWindow(QMainWindow):
         )
         self.image_tools_card.action_btn.clicked.connect(lambda: self._handle_card("image_tools"))
 
-        # 5. Subtitle Generator (Columna 2, fila 1)
+        # 5. Subtitle Generator
         self.subtitle_card = AppCard(
             card_id="subtitle",
             title="Subtitle Generator",
@@ -590,13 +587,9 @@ class HubWindow(QMainWindow):
             "subtitle":    self.subtitle_card,
         }
 
-        # Bento layout placements:
-        # Hero card: row 0, col 0, rowSpan 2, colSpan 1
         self.grid_layout.addWidget(self.media_card, 0, 0, 2, 1)
-        # Top right cards:
         self.grid_layout.addWidget(self.docs_card, 0, 1)
         self.grid_layout.addWidget(self.link_card, 0, 2)
-        # Bottom right cards:
         self.grid_layout.addWidget(self.image_tools_card, 1, 1)
         self.grid_layout.addWidget(self.subtitle_card, 1, 2)
 
@@ -627,7 +620,6 @@ class HubWindow(QMainWindow):
         self._update_dock_status()
 
     def _open_apps_folder(self):
-        """Abre la carpeta donde residen las micro-apps."""
         path = get_apps_install_dir()
         try:
             os.startfile(path)

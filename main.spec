@@ -16,6 +16,7 @@ hidden_imports += collect_submodules('core')
 
 datas = [
     ('assets/hub', 'assets/hub'),
+    ('version.json', '.'),
 ]
 
 a = Analysis(

@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon, QFont
 
-from core.config import APP_VERSION, GITHUB_REPO
+from core.config import get_launcher_version, save_launcher_version, GITHUB_REPO
 
 API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
@@ -18,22 +18,19 @@ API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 def extract_version_from_release(data: dict) -> str:
     """
     Extrae el número de versión del release de GitHub.
-    Primero intenta leerlo desde el nombre de los assets (ej: 'MediaHub_v1.4_Setup.exe'),
-    luego desde el tag_name como respaldo.
-    Devuelve la versión sin 'v' (ej: '1.4').
+    Primero busca en el tag_name o en los assets.
+    Devuelve la versión sin 'v' (ej: '1.0.0').
     """
-    # Buscar en los assets: MediaHub_v{VERSION}_Setup.exe
-    for asset in data.get("assets", []):
-        asset_name = asset.get("name", "")
-        match = re.search(r'MediaHub_v([\d.]+)', asset_name, re.IGNORECASE)
-        if match:
-            return match.group(1)
-
-    # Respaldo: usar el tag_name del release
     tag = data.get("tag_name", "")
     match = re.search(r'v?([\d.]+)', tag)
     if match:
         return match.group(1)
+
+    for asset in data.get("assets", []):
+        asset_name = asset.get("name", "")
+        match = re.search(r'MediaHub[_\-v]+([\d.]+)', asset_name, re.IGNORECASE)
+        if match:
+            return match.group(1)
 
     return ""
 
@@ -50,7 +47,7 @@ class DownloadThread(QThread):
 
     def run(self):
         try:
-            response = requests.get(self.download_url, stream=True, timeout=10)
+            response = requests.get(self.download_url, stream=True, timeout=15)
             response.raise_for_status()
             total_size = int(response.headers.get('content-length', 0))
             block_size = 8192
@@ -93,7 +90,7 @@ class UpdateDialog(QDialog):
         layout.setSpacing(15)
 
         # Title
-        title_label = QLabel(f"¡Actualización {self.version} disponible!")
+        title_label = QLabel(f"¡Actualización v{self.version} disponible!")
         font = QFont()
         font.setPointSize(14)
         font.setBold(True)
@@ -103,7 +100,7 @@ class UpdateDialog(QDialog):
 
         # Description
         self.desc_browser = QTextBrowser()
-        self.desc_browser.setMarkdown(description)
+        self.desc_browser.setMarkdown(description if description else "Nueva versión de Media Hub Launcher disponible.")
         self.desc_browser.setOpenExternalLinks(True)
         layout.addWidget(self.desc_browser)
 
@@ -156,7 +153,13 @@ class UpdateDialog(QDialog):
 
     def on_download_finished(self, save_path):
         self.progress_bar.setValue(100)
-        QMessageBox.information(self, "Descarga Completa", "La actualización se ha descargado. La aplicación se cerrará para instalar la nueva versión.")
+        # Guardar la nueva versión que se instalará
+        save_launcher_version(self.version)
+        QMessageBox.information(
+            self, "Descarga Completa",
+            "La actualización se ha descargado correctamente.\n"
+            "La aplicación se cerrará para iniciar el instalador."
+        )
         
         # Execute the installer and exit
         try:
@@ -183,6 +186,7 @@ class UpdateDialog(QDialog):
 
 class CheckUpdateThread(QThread):
     update_available = pyqtSignal(str, str, str, float)
+    latest_version_detected = pyqtSignal(str)
 
     def run(self):
         try:
@@ -194,7 +198,9 @@ class CheckUpdateThread(QThread):
             if not lat_v:
                 return
 
-            curr_v = APP_VERSION.lstrip('v')
+            self.latest_version_detected.emit(lat_v)
+
+            curr_v = get_launcher_version().lstrip('v')
 
             curr_parts = [int(x) for x in curr_v.split('.') if x.isdigit()]
             lat_parts = [int(x) for x in lat_v.split('.') if x.isdigit()]
@@ -232,59 +238,3 @@ class CheckUpdateThread(QThread):
 
         except Exception as e:
             print(f"Update check failed: {e}")
-
-def check_for_updates(parent=None):
-    """
-    Checks GitHub for newer releases.
-    Extrae la versión desde el nombre del asset (ej: 'MediaHub_v1.4_Setup.exe')
-    para comparar correctamente con APP_VERSION.
-    """
-    try:
-        response = requests.get(API_URL, timeout=5)
-        response.raise_for_status()
-        data = response.json()
-
-        lat_v = extract_version_from_release(data)
-        if not lat_v:
-            return
-
-        curr_v = APP_VERSION.lstrip('v')
-
-        curr_parts = [int(x) for x in curr_v.split('.') if x.isdigit()]
-        lat_parts = [int(x) for x in lat_v.split('.') if x.isdigit()]
-
-        if not curr_parts or not lat_parts:
-            is_newer = (curr_v != lat_v)
-        else:
-            is_newer = False
-            is_older = False
-            for c, l in zip(curr_parts, lat_parts):
-                if l > c:
-                    is_newer = True
-                    break
-                elif l < c:
-                    is_older = True
-                    break
-
-            if len(lat_parts) > len(curr_parts) and not is_newer and not is_older:
-                is_newer = True
-
-        if is_newer:
-            description = data.get("body", "No hay descripción disponible.")
-            assets = data.get("assets", [])
-            download_url = None
-            size_mb = 0
-
-            for asset in assets:
-                if asset.get("name", "").endswith(".exe"):
-                    download_url = asset.get("browser_download_url")
-                    size_mb = asset.get("size", 0) / (1024 * 1024)
-                    break
-
-            if download_url:
-                dialog = UpdateDialog(lat_v, description, download_url, size_mb, parent)
-                dialog.exec()
-
-    except Exception as e:
-        print(f"Update check failed: {e}")
-
