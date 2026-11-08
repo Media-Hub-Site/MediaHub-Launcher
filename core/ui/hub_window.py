@@ -112,13 +112,14 @@ def get_app_exe(app_id: str) -> str | None:
 
 
 def launch_app(app_id: str):
-    """Lanza la micro-app instalada como proceso independiente."""
+    """Lanza la micro-app instalada como proceso independiente del sistema."""
     exe = get_app_exe(app_id)
-    if exe:
-        app_dir = os.path.dirname(exe)
-        subprocess.Popen([exe], cwd=app_dir)
-
-
+    if exe and os.path.isfile(exe):
+        try:
+            os.startfile(exe)
+        except Exception:
+            app_dir = os.path.dirname(exe)
+            subprocess.Popen([exe], cwd=app_dir)
 def is_version_newer(current_ver: str, latest_ver: str) -> bool:
     """
     Compara semver básico (ej: '1.0.0' vs '1.1.0').
