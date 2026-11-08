@@ -1,7 +1,7 @@
-# 🎛️ Media Hub — v1.1.0
+# 🎛️ Media Hub — Launcher v1.1.0
 
 Aplicación de escritorio con diversas herramientas para su uso cotidiano, alguna vez necesitaste convertir archivos a otro formato?
-MediaHub contiene diversos tipos de conversiones multimedia, mejoras de calidad de imagen con modelos de IA y más.
+MediaHub-Launcher contiene varias aplicaciones a tu disposición con diversos tipos de conversiones multimedia, mejoras de calidad de imagen con modelos de IA y más.
 
 ---
 
