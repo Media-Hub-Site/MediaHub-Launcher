@@ -3,6 +3,8 @@
 Aplicación de escritorio con diversas herramientas para su uso cotidiano, alguna vez necesitaste convertir archivos a otro formato?
 MediaHub-Launcher contiene varias aplicaciones a tu disposición con diversos tipos de conversiones multimedia, mejoras de calidad de imagen con modelos de IA y más.
 
+RELEASES
+
 ---
 
 ## 🚀 Herramientas Incluidas
@@ -51,7 +53,7 @@ Corta o recorta archivos de audio visualizando el waveform interactivo, con sopo
 
 ---
 
-## 📦 Instalación
+## 📦 Instalación VSCode
 
 ### 1. Clonar el repositorio
 ```powershell
