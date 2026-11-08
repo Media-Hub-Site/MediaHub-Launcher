@@ -36,22 +36,24 @@ def get_asset_path(filename):
     return os.path.join(base_dir, "assets", "hub", filename)
 
 
+def get_hub_data_dir() -> str:
+    """Carpeta raíz unificada para datos del Hub en el perfil de usuario: ~/.mediahub"""
+    home = os.environ.get("USERPROFILE") or os.path.expanduser("~")
+    hub_dir = os.path.join(home, ".mediahub")
+    os.makedirs(hub_dir, exist_ok=True)
+    return hub_dir
+
+
 def get_apps_install_dir() -> str:
-    """Carpeta raíz donde se instalan las micro-apps: %LOCALAPPDATA%\\MediaHub\\apps\\"""
-    local = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
-    path = os.path.join(local, "MediaHub", "apps")
+    """Carpeta raíz donde se instalan las micro-apps: ~/.mediahub/apps/"""
+    path = os.path.join(get_hub_data_dir(), "apps")
     os.makedirs(path, exist_ok=True)
     return path
 
 
 def get_installed_versions_file() -> str:
-    """Archivo JSON donde guardamos las versiones instaladas: %LOCALAPPDATA%\\MediaHub\\installed_versions.json"""
-    local = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
-    hub_dir = os.path.join(local, "MediaHub")
-    os.makedirs(hub_dir, exist_ok=True)
-    return os.path.join(hub_dir, "installed_versions.json")
-
-
+    """Archivo JSON donde guardamos las versiones instaladas: ~/.mediahub/installed_versions.json"""
+    return os.path.join(get_hub_data_dir(), "installed_versions.json")
 def load_installed_versions() -> dict:
     """Carga el diccionario {app_id: version_str} de apps instaladas."""
     fpath = get_installed_versions_file()
@@ -247,13 +249,18 @@ class InstallWorker(QThread):
             self.error.emit(f"Error al descargar:\n{e}")
             return
 
-        # Instalar / Extraer
-        self.progress.emit(82, "Instalando archivos…")
+        # Instalar / Extraer de forma 100% limpia
+        self.progress.emit(82, "Preparando e instalando archivos…")
         install_base = get_apps_install_dir()
         dest_dir = os.path.join(install_base, reg["dir"])
-        os.makedirs(dest_dir, exist_ok=True)
 
         try:
+            # Si ya existía una versión anterior (reinstalación o actualización),
+            # limpiamos el directorio para evitar archivos corruptos o mezclados.
+            if os.path.exists(dest_dir):
+                shutil.rmtree(dest_dir, ignore_errors=True)
+            os.makedirs(dest_dir, exist_ok=True)
+
             if asset_name.endswith(".zip"):
                 with zipfile.ZipFile(tmp_file, "r") as zf:
                     zf.extractall(dest_dir)
