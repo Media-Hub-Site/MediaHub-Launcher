@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QGridLayout, QFrame,
     QGraphicsDropShadowEffect, QMessageBox, QApplication,
-    QMenu
+    QMenu, QLineEdit
 )
 from PyQt6.QtGui import QPixmap, QIcon, QColor, QDrag, QAction
 from PyQt6.QtCore import QMimeData, Qt, QSize, QThread, pyqtSignal
@@ -517,6 +517,14 @@ class HubWindow(QMainWindow):
         header_layout.addLayout(header_text_layout)
         header_layout.addStretch()
 
+        # Barra de Búsqueda Rápida de Herramientas
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("🔍 Filtrar herramientas...")
+        self.search_input.setFixedWidth(200)
+        self.search_input.setFixedHeight(34)
+        self.search_input.textChanged.connect(self._filter_cards)
+        header_layout.addWidget(self.search_input)
+
         self.toggle_btn = QPushButton()
         self.toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.toggle_btn.clicked.connect(self._toggle_dark_mode)
@@ -619,6 +627,15 @@ class HubWindow(QMainWindow):
         main_layout.addWidget(self.footer_dock)
         self._update_dock_status()
 
+    def _filter_cards(self, query: str):
+        query = query.strip().lower()
+        for app_id, card in self._card_dict.items():
+            reg = APP_REGISTRY.get(app_id, {})
+            name = reg.get("name", "").lower()
+            desc = reg.get("description", "").lower()
+            match = (not query) or (query in name) or (query in desc) or (query in app_id)
+            card.setVisible(match)
+
     def _open_apps_folder(self):
         path = get_apps_install_dir()
         try:
@@ -632,10 +649,25 @@ class HubWindow(QMainWindow):
         total = len(APP_REGISTRY)
         updates_pending = sum(1 for c in self._card_dict.values() if getattr(c, "_pending_update_version", None))
 
+        # Calcular tamaño ocupado en ~/.mediahub/apps
+        apps_dir = get_apps_install_dir()
+        size_mb = 0.0
+        try:
+            for root, dirs, files in os.walk(apps_dir):
+                for f in files:
+                    fp = os.path.join(root, f)
+                    if os.path.isfile(fp):
+                        size_mb += os.path.getsize(fp)
+            size_mb = size_mb / (1024 * 1024)
+        except Exception:
+            pass
+
+        size_str = f"{size_mb:.1f} MB" if size_mb < 1024 else f"{size_mb/1024:.2f} GB"
+
         if updates_pending > 0:
-            self.dock_status_label.setText(f"🚀 Hay {updates_pending} actualización(es) disponible(s) para tus herramientas.")
+            self.dock_status_label.setText(f"🚀 Hay {updates_pending} actualización(es) disponible(s) • Ocupado: {size_str}")
         else:
-            self.dock_status_label.setText(f"✓ {count} de {total} herramientas instaladas • Almacenamiento optimizado")
+            self.dock_status_label.setText(f"✓ {count} de {total} herramientas instaladas • {size_str} en disco")
 
     # ── Card Handler ─────────────────────────────────────────────────────────
 
