@@ -5,8 +5,6 @@ MediaHub contiene diversos tipos de conversiones multimedia, mejoras de calidad 
 
 ---
 
-## ✨ Novedades en v1.5
-
 - 🚀 **Aceleración por Hardware (GPU):** Ahora el motor detecta automáticamente tarjetas de video NVIDIA o AMD para usar NVENC / AMF, logrando conversiones de video hasta 10 veces más rápidas.
 - 🖼️ **Single-Page Application (SPA):** La navegación ha sido reescrita por completo. Ahora todas las ventanas fluyen de manera anidada (`QStackedWidget`), evitando cierres y aperturas constantes de nuevas ventanas.
 - 👆 **Menú Principal Personalizable:** Las tarjetas del Hub Principal soportan Drag and Drop (Arrastrar y Soltar), permitiéndote ordenar las herramientas como prefieras. Se guardará tu preferencia para futuras sesiones.
