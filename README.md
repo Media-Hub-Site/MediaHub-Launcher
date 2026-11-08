@@ -9,7 +9,7 @@ MediaHub-Launcher contiene varias aplicaciones a tu disposición con diversos ti
 
 ---
 
-## 🚀 Herramientas Incluidas
+## Herramientas Incluidas
 ### 1. 🎞️ Multimedia Converter
 Conversión profesional de archivos multimedia en modo individual o por lotes.
 | Módulo | Formatos soportados |
