@@ -1,6 +1,7 @@
 # 🎛️ Media Hub — v1.5
 
-Aplicación de escritorio modular hecha en Python (PyQt6) que agrupa múltiples herramientas de conversión y edición impulsadas por Inteligencia Artificial y utilidades multimedia avanzadas. Diseñada para ser **rápida, privada** (todo el procesamiento es local) y **libre de anuncios**.
+Aplicación de escritorio con diversas herramientas para su uso cotidiano, alguna vez necesitaste convertir archivos a otro formato?
+MediaHub contiene diversos tipos de conversiones multimedia, mejoras de calidad de imagen con modelos de IA y mas
 
 ---
 
