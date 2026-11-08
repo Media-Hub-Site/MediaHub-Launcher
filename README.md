@@ -5,16 +5,6 @@ MediaHub-Launcher contiene varias aplicaciones a tu disposición con diversos ti
 
 ---
 
-- 🚀 **Aceleración por Hardware (GPU):** Ahora el motor detecta automáticamente tarjetas de video NVIDIA o AMD para usar NVENC / AMF, logrando conversiones de video hasta 10 veces más rápidas.
-- 🖼️ **Single-Page Application (SPA):** La navegación ha sido reescrita por completo. Ahora todas las ventanas fluyen de manera anidada (`QStackedWidget`), evitando cierres y aperturas constantes de nuevas ventanas.
-- 👆 **Menú Principal Personalizable:** Las tarjetas del Hub Principal soportan Drag and Drop (Arrastrar y Soltar), permitiéndote ordenar las herramientas como prefieras. Se guardará tu preferencia para futuras sesiones.
-- 📂 **Visor de Resultados Integrado:** En lugar de abrir la carpeta de Windows, ahora se despliega una agradable galería nativa para visualizar las miniaturas del contenido que acabas de generar.
-- 💬 **Generador de Subtítulos con IA:** Nueva herramienta que usa `whisper.cpp` para transcribir audio y video localmente a altísima velocidad.
-- © **Marca de Agua Masiva:** Herramienta para aplicar logotipos e identidades visuales a colecciones enteras de imágenes y videos.
-- ☁️ **GitHub CI/CD:** El proyecto cuenta con un flujo de trabajo para compilar `.exe` automáticamente en la nube.
-
----
-
 ## 🚀 Herramientas Incluidas
 
 ### 1. 🎞️ Multimedia Converter
