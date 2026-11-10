@@ -21,7 +21,8 @@ from PyQt6.QtCore import QMimeData, Qt, QSize, QThread, pyqtSignal
 
 from core.theme_manager import ThemeManager
 from core.updater import CheckUpdateThread, UpdateDialog
-from core.config import APP_REGISTRY, get_launcher_version, save_launcher_version
+from core.config import APP_REGISTRY, get_launcher_version, save_launcher_version, get_app_metadata
+from core.i18n import t, get_current_language, save_current_language, save_app_language, get_app_language
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -307,9 +308,10 @@ class InstallWorker(QThread):
     finished = pyqtSignal(str, str)
     error    = pyqtSignal(str)
 
-    def __init__(self, app_id: str, parent=None):
+    def __init__(self, app_id: str, target_lang: str = "es", parent=None):
         super().__init__(parent)
         self.app_id = app_id
+        self.target_lang = target_lang
 
     def run(self):
         reg = APP_REGISTRY.get(self.app_id)
@@ -377,12 +379,15 @@ class InstallWorker(QThread):
             else:
                 subprocess.run([tmp_file, "/SILENT", f"/DIR={dest_dir}"], check=True)
             save_installed_version(self.app_id, latest_tag)
+            save_app_language(reg["dir"], self.target_lang)
         except Exception as e:
             self.error.emit(f"Error al instalar:\n{e}")
             return
 
-        self.progress.emit(100, "¡Listo!")
-        self.finished.emit(self.app_id, reg["name"])
+        self.progress.emit(100, t("status_ready"))
+        curr_lang = get_current_language()
+        meta = get_app_metadata(self.app_id, curr_lang)
+        self.finished.emit(self.app_id, meta.get("name", reg.get("name", self.app_id)))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -506,18 +511,18 @@ class AppCard(QFrame):
         """)
 
         if has_desktop_shortcut(self.card_id):
-            shortcut_act = menu.addAction("🔗  Quitar acceso directo")
+            shortcut_act = menu.addAction(t("menu_remove_shortcut"))
             shortcut_act.triggered.connect(lambda: self.window()._remove_shortcut(self.card_id))
         else:
-            shortcut_act = menu.addAction("📌  Crear acceso directo")
+            shortcut_act = menu.addAction(t("menu_create_shortcut"))
             shortcut_act.triggered.connect(lambda: self.window()._create_shortcut(self.card_id))
 
         menu.addSeparator()
 
-        reinstall_act = menu.addAction("🔄  Reinstalar")
+        reinstall_act = menu.addAction(t("menu_reinstall"))
         reinstall_act.triggered.connect(lambda: self.window()._reinstall_app(self.card_id))
 
-        uninstall_act = menu.addAction("🗑️  Desinstalar")
+        uninstall_act = menu.addAction(t("menu_uninstall"))
         uninstall_act.triggered.connect(lambda: self.window()._uninstall_app(self.card_id))
 
         menu.exec(self.options_btn.mapToGlobal(self.options_btn.rect().bottomLeft()))
@@ -547,26 +552,41 @@ class AppCard(QFrame):
         size_suffix = f" • {size_str}" if size_str else ""
 
         if state == "open":
-            self.action_btn.setText("Abrir")
+            self.action_btn.setText(t("btn_open"))
             self.action_btn.setEnabled(True)
             v_text = f"v{cur_ver}" if cur_ver else ""
-            self._status_label.setText(f"● Listo {v_text}{size_suffix}".strip())
+            ready_txt = t("status_ready")
+            self._status_label.setText(f"{ready_txt} {v_text}{size_suffix}".strip())
             self.options_btn.show()
         elif state == "update":
-            self.action_btn.setText("Actualizar")
+            self.action_btn.setText(t("btn_update"))
             self.action_btn.setEnabled(True)
-            self._status_label.setText(f"↑ v{self._pending_update_version}{size_suffix}")
+            up_symbol = t("status_update")
+            self._status_label.setText(f"{up_symbol} v{self._pending_update_version}{size_suffix}")
             self.options_btn.show()
         elif state == "install":
-            self.action_btn.setText("Instalar")
+            self.action_btn.setText(t("btn_install"))
             self.action_btn.setEnabled(True)
-            self._status_label.setText(f"No instalada{size_suffix}")
+            uninst_txt = t("status_uninstalled")
+            self._status_label.setText(f"{uninst_txt}{size_suffix}")
             self.options_btn.hide()
         else:
-            self.action_btn.setText("Próximamente")
+            self.action_btn.setText(t("btn_coming_soon"))
             self.action_btn.setEnabled(False)
             self._status_label.setText("")
             self.options_btn.hide()
+
+    def update_texts(self):
+        """Actualiza el título, subtítulo y badge según el idioma actual."""
+        curr_lang = get_current_language()
+        meta = get_app_metadata(self.card_id, curr_lang)
+        if meta:
+            self._title_label.setText(meta.get("name", self.card_id))
+            self._subtitle_label.setText(meta.get("description", ""))
+            if hasattr(self, "_badge_label"):
+                self._badge_label.setText(meta.get("badge", ""))
+        self.options_btn.setToolTip(t("options_tooltip"))
+        self.refresh_state()
 
     def apply_styles(self, styles: dict):
         if self._is_disabled:
@@ -687,6 +707,12 @@ class HubWindow(QMainWindow):
         self.search_input.textChanged.connect(self._filter_cards)
         header_layout.addWidget(self.search_input)
 
+        self.lang_btn = QPushButton()
+        self.lang_btn.setObjectName("hubLangBtn")
+        self.lang_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.lang_btn.clicked.connect(self._toggle_language)
+        header_layout.addWidget(self.lang_btn)
+
         self.toggle_btn = QPushButton()
         self.toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.toggle_btn.clicked.connect(self._toggle_dark_mode)
@@ -724,14 +750,16 @@ class HubWindow(QMainWindow):
         ]
         slot_idx = 0
 
-        for app_id, meta in APP_REGISTRY.items():
-            is_hero = meta.get("is_hero", False)
-            is_disabled = meta.get("is_disabled", False)
+        curr_lang = get_current_language()
+        for app_id, raw_meta in APP_REGISTRY.items():
+            meta = get_app_metadata(app_id, curr_lang)
+            is_hero = raw_meta.get("is_hero", False)
+            is_disabled = raw_meta.get("is_disabled", False)
             card = AppCard(
                 card_id=app_id,
                 title=meta.get("name", app_id),
                 subtitle=meta.get("description", ""),
-                icon_file=meta.get("icon", "media.png"),
+                icon_file=raw_meta.get("icon", "media.png"),
                 badge_text=meta.get("badge", ""),
                 is_hero=is_hero,
                 is_disabled=is_disabled
@@ -828,9 +856,9 @@ class HubWindow(QMainWindow):
         size_str = f"{size_mb:.1f} MB" if size_mb < 1024 else f"{size_mb/1024:.2f} GB"
 
         if updates_pending > 0:
-            self.dock_status_label.setText(f"🚀 Hay {updates_pending} actualización(es) disponible(s) • Ocupado: {size_str}")
+            self.dock_status_label.setText(t("dock_updates", count=updates_pending, size=size_str))
         else:
-            self.dock_status_label.setText(f"✓ {count} de {total} herramientas instaladas • {size_str} en disco")
+            self.dock_status_label.setText(t("dock_installed", count=count, total=total, size=size_str))
 
     # ── Card Handler ─────────────────────────────────────────────────────────
 
@@ -852,11 +880,35 @@ class HubWindow(QMainWindow):
         if not reg:
             return
 
+        curr_lang = get_current_language()
+        meta = get_app_metadata(app_id, curr_lang)
+        app_name = meta.get("name", reg.get("name", app_id))
+
+        # Diálogo para definir el idioma único de instalación (Issue #5)
+        lang_dialog = QMessageBox(self)
+        lang_dialog.setWindowTitle(t("dialog_choose_lang_title"))
+        lang_dialog.setText(t("dialog_choose_lang_msg", name=app_name))
+        es_btn = lang_dialog.addButton("🇪🇸  Español", QMessageBox.ButtonRole.ActionRole)
+        en_btn = lang_dialog.addButton("🇺🇸  English", QMessageBox.ButtonRole.ActionRole)
+        cancel_btn = lang_dialog.addButton(QMessageBox.StandardButton.Cancel)
+
+        if curr_lang == "en":
+            lang_dialog.setDefaultButton(en_btn)
+        else:
+            lang_dialog.setDefaultButton(es_btn)
+
+        lang_dialog.exec()
+        clicked = lang_dialog.clickedButton()
+        if clicked == cancel_btn or not clicked:
+            return
+
+        target_lang = "es" if clicked == es_btn else "en"
+
         card = self._card_dict[app_id]
         card.action_btn.setEnabled(False)
-        card._status_label.setText("⏳ Descargando…")
+        card._status_label.setText("⏳ Descargando…" if curr_lang == "es" else "⏳ Downloading…")
 
-        worker = InstallWorker(app_id, parent=self)
+        worker = InstallWorker(app_id, target_lang=target_lang, parent=self)
         worker.progress.connect(lambda pct, msg: self._on_install_progress(app_id, pct, msg))
         worker.finished.connect(self._on_install_done)
         worker.error.connect(lambda err: self._on_install_error(app_id, err))
@@ -880,25 +932,24 @@ class HubWindow(QMainWindow):
         
         # Preguntar al usuario si desea crear un acceso directo en el escritorio (Issue #3)
         msg_box = QMessageBox(self)
-        msg_box.setWindowTitle("Instalación completada")
-        msg_box.setText(f"✅ <b>{name}</b> se ha instalado correctamente.")
-        msg_box.setInformativeText("¿Deseas crear un acceso directo en tu Escritorio para abrirla de forma independiente?")
+        msg_box.setWindowTitle(t("dialog_install_done_title"))
+        msg_box.setText(t("dialog_install_done_msg", name=name))
+        msg_box.setInformativeText(t("dialog_install_done_shortcut_prompt"))
         msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         msg_box.setDefaultButton(QMessageBox.StandardButton.Yes)
         yes_btn = msg_box.button(QMessageBox.StandardButton.Yes)
         if yes_btn:
-            yes_btn.setText("Sí, crear acceso directo")
+            yes_btn.setText(t("btn_yes_shortcut"))
         no_btn = msg_box.button(QMessageBox.StandardButton.No)
         if no_btn:
-            no_btn.setText("No, gracias")
+            no_btn.setText(t("btn_no_shortcut"))
         
         reply = msg_box.exec()
         if reply == QMessageBox.StandardButton.Yes:
             if create_desktop_shortcut(app_id):
                 QMessageBox.information(
-                    self, "Acceso Directo Creado",
-                    f"📌 Se ha creado el acceso directo de <b>{name}</b> en tu Escritorio.\n"
-                    "Puedes abrir la aplicación directamente cuando quieras sin abrir el Launcher."
+                    self, t("dialog_shortcut_created_title"),
+                    t("dialog_shortcut_created_msg", name=name)
                 )
 
     def _on_install_error(self, app_id: str, err: str):
@@ -993,6 +1044,11 @@ class HubWindow(QMainWindow):
 
     # ── Theme ─────────────────────────────────────────────────────────────────
 
+    def _toggle_language(self):
+        new_lang = "en" if get_current_language() == "es" else "es"
+        save_current_language(new_lang)
+        self._apply_theme()
+
     def _toggle_dark_mode(self):
         self._tm.toggle()
         self._apply_theme()
@@ -1002,12 +1058,30 @@ class HubWindow(QMainWindow):
         self.setStyleSheet(styles["window"])
         self.title_label.setStyleSheet(styles["title"])
         self.subtitle_label.setStyleSheet(styles["header_sub"])
+
+        curr = get_launcher_version()
+        self.subtitle_label.setText(t("app_subtitle", version=curr))
+        self.search_input.setPlaceholderText(t("search_placeholder"))
         self.search_input.setStyleSheet(styles.get("search_input", ""))
+
+        # Botón de idioma
+        curr_lang = get_current_language()
+        self.lang_btn.setStyleSheet(styles["toggle_btn"])
+        self.lang_btn.setText("🌐  English" if curr_lang == "es" else "🌐  Español")
+        self.lang_btn.setToolTip("Cambiar idioma / Switch language")
+
         self.toggle_btn.setStyleSheet(styles["toggle_btn"])
         self.toggle_btn.setText(
-            "☀️  Modo Claro" if self._tm.is_dark else "🌙  Modo Oscuro")
+            t("btn_light_mode") if self._tm.is_dark else t("btn_dark_mode"))
         self.scroll_area.setStyleSheet(styles.get("scroll_area", ""))
         self.footer_dock.setStyleSheet(styles["dock"])
 
+        self.feedback_btn.setText(t("dock_feedback"))
+        self.feedback_btn.setToolTip(t("dock_feedback_tooltip"))
+        self.dock_folder_btn.setText(t("dock_folder"))
+
+        self._update_dock_status()
+
         for card in self._card_dict.values():
+            card.update_texts()
             card.apply_styles(styles)
