@@ -219,21 +219,36 @@ def save_cached_sizes(sizes: dict):
 
 
 def launch_app(app_id: str):
-    """Lanza la micro-app instalada como proceso independiente del sistema."""
+    """Lanza la micro-app instalada como proceso independiente del sistema inyectando su idioma."""
     exe = get_app_exe(app_id)
     if exe and os.path.isfile(exe):
         try:
-            os.startfile(exe)
+            reg = APP_REGISTRY.get(app_id, {})
+            app_dir = reg.get("dir", app_id)
+            app_lang = get_app_language(app_dir)
+
+            env = os.environ.copy()
+            env["MEDIAHUB_APP_LANG"] = app_lang
+            env["MEDIAHUB_LANG"] = app_lang
+            env["LANG"] = f"{app_lang}_ES.UTF-8" if app_lang == "es" else f"{app_lang}_US.UTF-8"
+
+            # Iniciar como proceso desacoplado pasando --lang y variables de entorno
+            subprocess.Popen(
+                [exe, f"--lang={app_lang}"],
+                cwd=os.path.dirname(exe),
+                env=env,
+                creationflags=subprocess.DETACHED_PROCESS if os.name == "nt" else 0,
+                close_fds=True
+            )
         except Exception as e:
             QMessageBox.critical(
-                None, "Error al abrir",
+                None, t("dialog_not_installed_title"),
                 f"No se pudo iniciar la aplicación:\n{e}\n\nRuta: {exe}"
             )
     else:
         QMessageBox.warning(
-            None, "No instalada",
-            "La aplicación aún no está instalada.\n"
-            "Haz clic en 'Instalar' para descargarla automáticamente."
+            None, t("dialog_not_installed_title"),
+            t("dialog_not_installed_msg")
         )
 
 
@@ -510,6 +525,9 @@ class AppCard(QFrame):
             }}
         """)
 
+        lang_act = menu.addAction(t("menu_change_lang"))
+        lang_act.triggered.connect(lambda: self.window()._change_app_language(self.card_id))
+
         if has_desktop_shortcut(self.card_id):
             shortcut_act = menu.addAction(t("menu_remove_shortcut"))
             shortcut_act.triggered.connect(lambda: self.window()._remove_shortcut(self.card_id))
@@ -701,7 +719,7 @@ class HubWindow(QMainWindow):
 
         # Barra de Búsqueda Rápida de Herramientas
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 Filtrar herramientas...")
+        self.search_input.setPlaceholderText(t("search_placeholder"))
         self.search_input.setFixedWidth(200)
         self.search_input.setFixedHeight(34)
         self.search_input.textChanged.connect(self._filter_cards)
@@ -793,14 +811,14 @@ class HubWindow(QMainWindow):
         dock_layout.addWidget(self.dock_status_label)
         dock_layout.addStretch()
 
-        self.feedback_btn = QPushButton("💬 Encuesta de Satisfacción")
+        self.feedback_btn = QPushButton(t("dock_feedback"))
         self.feedback_btn.setObjectName("dockLink")
         self.feedback_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.feedback_btn.setToolTip("Danos tu opinión o reporta errores para seguir mejorando Media Hub")
         self.feedback_btn.clicked.connect(self._open_feedback_form)
         dock_layout.addWidget(self.feedback_btn)
 
-        self.dock_folder_btn = QPushButton("📁 Abrir carpeta de apps")
+        self.dock_folder_btn = QPushButton(t("dock_folder"))
         self.dock_folder_btn.setObjectName("dockLink")
         self.dock_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.dock_folder_btn.clicked.connect(self._open_apps_folder)
@@ -888,8 +906,8 @@ class HubWindow(QMainWindow):
         lang_dialog = QMessageBox(self)
         lang_dialog.setWindowTitle(t("dialog_choose_lang_title"))
         lang_dialog.setText(t("dialog_choose_lang_msg", name=app_name))
-        es_btn = lang_dialog.addButton("🇪🇸  Español", QMessageBox.ButtonRole.ActionRole)
-        en_btn = lang_dialog.addButton("🇺🇸  English", QMessageBox.ButtonRole.ActionRole)
+        es_btn = lang_dialog.addButton(t("lang_name_es"), QMessageBox.ButtonRole.ActionRole)
+        en_btn = lang_dialog.addButton(t("lang_name_en"), QMessageBox.ButtonRole.ActionRole)
         cancel_btn = lang_dialog.addButton(QMessageBox.StandardButton.Cancel)
 
         if curr_lang == "en":
@@ -906,7 +924,7 @@ class HubWindow(QMainWindow):
 
         card = self._card_dict[app_id]
         card.action_btn.setEnabled(False)
-        card._status_label.setText("⏳ Descargando…" if curr_lang == "es" else "⏳ Downloading…")
+        card._status_label.setText("Descargando…" if curr_lang == "es" else "Downloading…")
 
         worker = InstallWorker(app_id, target_lang=target_lang, parent=self)
         worker.progress.connect(lambda pct, msg: self._on_install_progress(app_id, pct, msg))
@@ -918,7 +936,7 @@ class HubWindow(QMainWindow):
     def _on_install_progress(self, app_id: str, pct: int, msg: str):
         card = self._card_dict.get(app_id)
         if card:
-            card._status_label.setText(f"⏳ {pct}%")
+            card._status_label.setText(f"{pct}%")
 
     def _on_install_done(self, app_id: str, name: str):
         self._workers.pop(app_id, None)
@@ -961,14 +979,49 @@ class HubWindow(QMainWindow):
             card.apply_styles(styles)
         QMessageBox.critical(self, "Error de instalación", err)
 
+    def _change_app_language(self, app_id: str):
+        reg = APP_REGISTRY.get(app_id)
+        if not reg:
+            return
+        curr_lang = get_current_language()
+        meta = get_app_metadata(app_id, curr_lang)
+        app_name = meta.get("name", reg.get("name", app_id))
+        app_dir = reg.get("dir", app_id)
+        current_app_lang = get_app_language(app_dir)
+
+        lang_dialog = QMessageBox(self)
+        lang_dialog.setWindowTitle(t("dialog_choose_lang_title"))
+        lang_dialog.setText(t("dialog_choose_lang_msg", name=app_name))
+        es_btn = lang_dialog.addButton(t("lang_name_es"), QMessageBox.ButtonRole.ActionRole)
+        en_btn = lang_dialog.addButton(t("lang_name_en"), QMessageBox.ButtonRole.ActionRole)
+        cancel_btn = lang_dialog.addButton(QMessageBox.StandardButton.Cancel)
+
+        if current_app_lang == "en":
+            lang_dialog.setDefaultButton(en_btn)
+        else:
+            lang_dialog.setDefaultButton(es_btn)
+
+        lang_dialog.exec()
+        clicked = lang_dialog.clickedButton()
+        if clicked == cancel_btn or not clicked:
+            return
+
+        chosen_lang = "es" if clicked == es_btn else "en"
+        save_app_language(app_dir, chosen_lang)
+        lang_label = t("lang_name_es") if chosen_lang == "es" else t("lang_name_en")
+        QMessageBox.information(
+            self,
+            t("dialog_lang_updated_title"),
+            t("dialog_lang_updated_msg", name=app_name, lang_name=lang_label)
+        )
+
     def _reinstall_app(self, app_id: str):
         reg = APP_REGISTRY.get(app_id)
         app_name = reg["name"] if reg else app_id
         reply = QMessageBox.question(
             self,
-            "Reinstalar aplicación",
-            f"¿Deseas descargar y reinstalar <b>{app_name}</b>?<br><br>"
-            "Esto sobreescribirá los archivos de la app con la versión más reciente.",
+            t("dialog_reinstall_title"),
+            t("dialog_reinstall_msg", name=app_name),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.Yes
         )
@@ -980,8 +1033,8 @@ class HubWindow(QMainWindow):
         name = reg.get("name", app_id)
         if create_desktop_shortcut(app_id):
             QMessageBox.information(
-                self, "Acceso directo creado",
-                f"📌 Se creó el acceso directo de <b>{name}</b> en tu Escritorio."
+                self, t("dialog_shortcut_created_title"),
+                t("dialog_shortcut_created_msg", name=name)
             )
         else:
             QMessageBox.warning(
@@ -994,8 +1047,8 @@ class HubWindow(QMainWindow):
         name = reg.get("name", app_id)
         if remove_desktop_shortcut(app_id):
             QMessageBox.information(
-                self, "Acceso directo eliminado",
-                f"🗑️ Se eliminó el acceso directo de <b>{name}</b> del Escritorio."
+                self, t("dialog_shortcut_removed_title"),
+                t("dialog_shortcut_removed_msg", name=name)
             )
 
     def _uninstall_app(self, app_id: str):
@@ -1006,9 +1059,8 @@ class HubWindow(QMainWindow):
 
         reply = QMessageBox.question(
             self,
-            "Desinstalar aplicación",
-            f"¿Estás seguro de que deseas desinstalar <b>{app_name}</b>?<br><br>"
-            "Se eliminarán los archivos locales de la aplicación y volverá al estado 'No instalada'.",
+            t("dialog_uninstall_title"),
+            t("dialog_uninstall_msg", name=app_name),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )
@@ -1031,8 +1083,8 @@ class HubWindow(QMainWindow):
             self._update_dock_status()
             QMessageBox.information(
                 self,
-                "Desinstalación completa",
-                f"✅ {app_name} se ha desinstalado correctamente."
+                t("dialog_uninstall_done_title"),
+                t("dialog_uninstall_done_msg", name=app_name)
             )
         except Exception as e:
             QMessageBox.critical(
@@ -1067,7 +1119,7 @@ class HubWindow(QMainWindow):
         # Botón de idioma
         curr_lang = get_current_language()
         self.lang_btn.setStyleSheet(styles["toggle_btn"])
-        self.lang_btn.setText("🌐  English" if curr_lang == "es" else "🌐  Español")
+        self.lang_btn.setText("English" if curr_lang == "es" else "Español")
         self.lang_btn.setToolTip("Cambiar idioma / Switch language")
 
         self.toggle_btn.setStyleSheet(styles["toggle_btn"])
