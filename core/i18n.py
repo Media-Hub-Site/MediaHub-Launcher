@@ -69,6 +69,9 @@ STRINGS = {
         "lang_name_es": "Español",
         "lang_name_en": "English",
         "btn_select": "Seleccionar",
+        "btn_sound_on": "Sonido: Activado",
+        "btn_sound_off": "Sonido: Silenciado",
+        "btn_sound_tooltip": "Activar o silenciar los efectos de sonido de la interfaz",
     },
     "en": {
         "app_title": "Media Hub",
@@ -121,6 +124,9 @@ STRINGS = {
         "lang_name_es": "Español",
         "lang_name_en": "English",
         "btn_select": "Select",
+        "btn_sound_on": "Sound: Enabled",
+        "btn_sound_off": "Sound: Muted",
+        "btn_sound_tooltip": "Toggle interface sound effects",
     }
 }
 
