@@ -55,11 +55,10 @@ jobs:
           # Verifica que el punto de entrada principal importe sin errores
           python -c "import main; print('[OK] main.py se importa limpiamente')"
 
-      - name: Dry-Run PyInstaller Spec Validation
+      - name: PyInstaller Spec Syntax Validation
         shell: pwsh
         run: |
           if (Test-Path main.spec) {
-            Write-Host "Validando archivo de empaquetado main.spec..."
-            # Asegura que el spec compile
-            python -c "exec(open('main.spec', encoding='utf-8').read()); print('[OK] main.spec es valido')"
+            Write-Host "Validando sintaxis de main.spec..."
+            python -c "import py_compile; py_compile.compile('main.spec', doraise=True); print('[OK] main.spec es valido')"
           }
