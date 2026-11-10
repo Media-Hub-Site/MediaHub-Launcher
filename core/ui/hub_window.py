@@ -116,6 +116,107 @@ def get_app_exe(app_id: str) -> str | None:
     return None
 
 
+def get_desktop_path() -> str:
+    """Retorna la ruta absoluta del Escritorio del usuario (soporta OneDrive y Windows local)."""
+    try:
+        import win32com.client
+        shell = win32com.client.Dispatch("WScript.Shell")
+        desk = shell.SpecialFolders("Desktop")
+        if os.path.isdir(desk):
+            return desk
+    except Exception:
+        pass
+    home = os.environ.get("USERPROFILE") or os.path.expanduser("~")
+    onedrive_desk = os.path.join(home, "OneDrive", "Desktop")
+    if os.path.isdir(onedrive_desk):
+        return onedrive_desk
+    standard_desk = os.path.join(home, "Desktop")
+    return standard_desk
+
+
+def get_desktop_shortcut_path(app_id: str) -> str:
+    """Devuelve la ruta del archivo .lnk de acceso directo para la aplicación en el Escritorio."""
+    reg = APP_REGISTRY.get(app_id, {})
+    name = reg.get("name", app_id)
+    # Sanitizar nombre para archivo
+    safe_name = "".join(c for c in name if c.isalnum() or c in (" ", "-", "_")).strip()
+    return os.path.join(get_desktop_path(), f"{safe_name}.lnk")
+
+
+def has_desktop_shortcut(app_id: str) -> bool:
+    """Verifica si ya existe el acceso directo en el Escritorio."""
+    return os.path.isfile(get_desktop_shortcut_path(app_id))
+
+
+def create_desktop_shortcut(app_id: str) -> bool:
+    """Crea un acceso directo en el Escritorio para la aplicación instalada."""
+    exe = get_app_exe(app_id)
+    if not exe or not os.path.isfile(exe):
+        return False
+    try:
+        import win32com.client
+        shell = win32com.client.Dispatch("WScript.Shell")
+        lnk_path = get_desktop_shortcut_path(app_id)
+        shortcut = shell.CreateShortcut(lnk_path)
+        shortcut.TargetPath = exe
+        shortcut.WorkingDirectory = os.path.dirname(exe)
+        shortcut.Description = APP_REGISTRY.get(app_id, {}).get("description", "")
+        # Buscar icono si existe
+        app_dir = os.path.dirname(exe)
+        for root, _, files in os.walk(app_dir):
+            for f in files:
+                if f.endswith(".ico"):
+                    shortcut.IconLocation = os.path.join(root, f)
+                    break
+            if getattr(shortcut, "IconLocation", None):
+                break
+        shortcut.save()
+        return True
+    except Exception as e:
+        print(f"Error creando acceso directo para {app_id}: {e}")
+        return False
+
+
+def remove_desktop_shortcut(app_id: str) -> bool:
+    """Elimina el acceso directo del Escritorio si existe."""
+    lnk_path = get_desktop_shortcut_path(app_id)
+    if os.path.isfile(lnk_path):
+        try:
+            os.remove(lnk_path)
+            return True
+        except Exception as e:
+            print(f"Error eliminando acceso directo {lnk_path}: {e}")
+            return False
+    return False
+
+
+def get_sizes_cache_file() -> str:
+    """Archivo JSON para cachear los tamaños de release de cada app."""
+    return os.path.join(get_hub_data_dir(), "app_sizes.json")
+
+
+def load_cached_sizes() -> dict:
+    """Carga diccionario con {app_id: size_str}."""
+    fpath = get_sizes_cache_file()
+    if os.path.isfile(fpath):
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+
+def save_cached_sizes(sizes: dict):
+    """Guarda caché de tamaños de apps."""
+    fpath = get_sizes_cache_file()
+    try:
+        with open(fpath, "w", encoding="utf-8") as f:
+            json.dump(sizes, f, indent=2)
+    except Exception as e:
+        print(f"Error guardando cache de tamaños: {e}")
+
+
 def launch_app(app_id: str):
     """Lanza la micro-app instalada como proceso independiente del sistema."""
     exe = get_app_exe(app_id)
@@ -162,6 +263,39 @@ class CheckMicroAppUpdatesThread(QThread):
                             self.update_found.emit(app_id, tag)
             except Exception:
                 pass
+
+
+class FetchAppSizesThread(QThread):
+    """Consulta en segundo plano el tamaño de descarga/release de cada app desde GitHub."""
+    sizes_fetched = pyqtSignal(dict)  # {app_id: "143 MB"}
+
+    def run(self):
+        sizes = load_cached_sizes()
+        changed = False
+        for app_id, reg in APP_REGISTRY.items():
+            repo = reg.get("repo")
+            if not repo or reg.get("is_disabled"):
+                continue
+            try:
+                url = f"https://api.github.com/repos/{repo}/releases/latest"
+                resp = requests.get(url, timeout=6)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    for asset in data.get("assets", []):
+                        if asset.get("name", "").endswith((".zip", ".exe")):
+                            sz_bytes = asset.get("size", 0)
+                            if sz_bytes > 0:
+                                mb = sz_bytes / (1024 * 1024)
+                                sz_str = f"{mb:.1f} MB" if mb < 1024 else f"{mb/1024:.2f} GB"
+                                if sizes.get(app_id) != sz_str:
+                                    sizes[app_id] = sz_str
+                                    changed = True
+                            break
+            except Exception:
+                pass
+        if changed:
+            save_cached_sizes(sizes)
+        self.sizes_fetched.emit(sizes)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -371,6 +505,15 @@ class AppCard(QFrame):
             }}
         """)
 
+        if has_desktop_shortcut(self.card_id):
+            shortcut_act = menu.addAction("🔗  Quitar acceso directo")
+            shortcut_act.triggered.connect(lambda: self.window()._remove_shortcut(self.card_id))
+        else:
+            shortcut_act = menu.addAction("📌  Crear acceso directo")
+            shortcut_act.triggered.connect(lambda: self.window()._create_shortcut(self.card_id))
+
+        menu.addSeparator()
+
         reinstall_act = menu.addAction("🔄  Reinstalar")
         reinstall_act.triggered.connect(lambda: self.window()._reinstall_app(self.card_id))
 
@@ -399,21 +542,25 @@ class AppCard(QFrame):
         installed = load_installed_versions()
         cur_ver = installed.get(self.card_id)
 
+        cached_sizes = load_cached_sizes()
+        size_str = cached_sizes.get(self.card_id, "")
+        size_suffix = f" • {size_str}" if size_str else ""
+
         if state == "open":
             self.action_btn.setText("Abrir")
             self.action_btn.setEnabled(True)
             v_text = f"v{cur_ver}" if cur_ver else ""
-            self._status_label.setText(f"● Listo {v_text}".strip())
+            self._status_label.setText(f"● Listo {v_text}{size_suffix}".strip())
             self.options_btn.show()
         elif state == "update":
             self.action_btn.setText("Actualizar")
             self.action_btn.setEnabled(True)
-            self._status_label.setText(f"↑ v{self._pending_update_version}")
+            self._status_label.setText(f"↑ v{self._pending_update_version}{size_suffix}")
             self.options_btn.show()
         elif state == "install":
             self.action_btn.setText("Instalar")
             self.action_btn.setEnabled(True)
-            self._status_label.setText("No instalada")
+            self._status_label.setText(f"No instalada{size_suffix}")
             self.options_btn.hide()
         else:
             self.action_btn.setText("Próximamente")
@@ -479,6 +626,11 @@ class HubWindow(QMainWindow):
         self.micro_apps_updater.update_found.connect(self._on_micro_app_update_found)
         self.micro_apps_updater.start()
 
+        # 3. Consulta de tamaño de cada aplicación (Issue #4)
+        self.sizes_thread = FetchAppSizesThread(self)
+        self.sizes_thread.sizes_fetched.connect(self._on_app_sizes_fetched)
+        self.sizes_thread.start()
+
     def show_update_dialog(self, version, description, download_url, size_mb):
         dialog = UpdateDialog(version, description, download_url, size_mb, self)
         dialog.exec()
@@ -494,6 +646,12 @@ class HubWindow(QMainWindow):
             card.set_update_available(new_version)
             card.apply_styles(self._tm.hub_styles())
         self._update_dock_status()
+
+    def _on_app_sizes_fetched(self, sizes: dict):
+        """Actualiza el texto de las tarjetas con el tamaño real de cada app."""
+        for card in self._card_dict.values():
+            card.refresh_state()
+            card.apply_styles(self._tm.hub_styles())
 
     # ── UI Layout ─────────────────────────────────────────────────────────────
 
@@ -719,11 +877,29 @@ class HubWindow(QMainWindow):
             styles = self._tm.hub_styles()
             card.apply_styles(styles)
         self._update_dock_status()
-        QMessageBox.information(
-            self, "Operación exitosa",
-            f"✅ {name} se ha instalado/actualizado correctamente.\n"
-            f"Ya puedes usar la versión más reciente."
-        )
+        
+        # Preguntar al usuario si desea crear un acceso directo en el escritorio (Issue #3)
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Instalación completada")
+        msg_box.setText(f"✅ <b>{name}</b> se ha instalado correctamente.")
+        msg_box.setInformativeText("¿Deseas crear un acceso directo en tu Escritorio para abrirla de forma independiente?")
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        msg_box.setDefaultButton(QMessageBox.StandardButton.Yes)
+        yes_btn = msg_box.button(QMessageBox.StandardButton.Yes)
+        if yes_btn:
+            yes_btn.setText("Sí, crear acceso directo")
+        no_btn = msg_box.button(QMessageBox.StandardButton.No)
+        if no_btn:
+            no_btn.setText("No, gracias")
+        
+        reply = msg_box.exec()
+        if reply == QMessageBox.StandardButton.Yes:
+            if create_desktop_shortcut(app_id):
+                QMessageBox.information(
+                    self, "Acceso Directo Creado",
+                    f"📌 Se ha creado el acceso directo de <b>{name}</b> en tu Escritorio.\n"
+                    "Puedes abrir la aplicación directamente cuando quieras sin abrir el Launcher."
+                )
 
     def _on_install_error(self, app_id: str, err: str):
         self._workers.pop(app_id, None)
@@ -747,6 +923,29 @@ class HubWindow(QMainWindow):
         )
         if reply == QMessageBox.StandardButton.Yes:
             self._start_install_or_update(app_id)
+
+    def _create_shortcut(self, app_id: str):
+        reg = APP_REGISTRY.get(app_id, {})
+        name = reg.get("name", app_id)
+        if create_desktop_shortcut(app_id):
+            QMessageBox.information(
+                self, "Acceso directo creado",
+                f"📌 Se creó el acceso directo de <b>{name}</b> en tu Escritorio."
+            )
+        else:
+            QMessageBox.warning(
+                self, "Aviso",
+                f"No se pudo crear el acceso directo para {name}."
+            )
+
+    def _remove_shortcut(self, app_id: str):
+        reg = APP_REGISTRY.get(app_id, {})
+        name = reg.get("name", app_id)
+        if remove_desktop_shortcut(app_id):
+            QMessageBox.information(
+                self, "Acceso directo eliminado",
+                f"🗑️ Se eliminó el acceso directo de <b>{name}</b> del Escritorio."
+            )
 
     def _uninstall_app(self, app_id: str):
         reg = APP_REGISTRY.get(app_id)
@@ -772,6 +971,7 @@ class HubWindow(QMainWindow):
             if os.path.exists(app_dir):
                 shutil.rmtree(app_dir)
             remove_installed_version(app_id)
+            remove_desktop_shortcut(app_id)
             card = self._card_dict.get(app_id)
             if card:
                 card._pending_update_version = None
