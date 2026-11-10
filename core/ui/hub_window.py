@@ -23,6 +23,7 @@ from core.theme_manager import ThemeManager
 from core.updater import CheckUpdateThread, UpdateDialog
 from core.config import APP_REGISTRY, get_launcher_version, save_launcher_version, get_app_metadata
 from core.i18n import t, get_current_language, save_current_language, save_app_language, get_app_language
+from core.sound_manager import SoundManager
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -162,15 +163,19 @@ def create_desktop_shortcut(app_id: str) -> bool:
         shortcut.TargetPath = exe
         shortcut.WorkingDirectory = os.path.dirname(exe)
         shortcut.Description = APP_REGISTRY.get(app_id, {}).get("description", "")
-        # Buscar icono si existe
-        app_dir = os.path.dirname(exe)
-        for root, _, files in os.walk(app_dir):
-            for f in files:
-                if f.endswith(".ico"):
-                    shortcut.IconLocation = os.path.join(root, f)
+        # Buscar icono específico de la app en launcher assets o en el directorio de la app
+        icon_path = get_asset_path(f"../icons/{app_id}.ico")
+        if os.path.isfile(icon_path):
+            shortcut.IconLocation = os.path.abspath(icon_path)
+        else:
+            app_dir = os.path.dirname(exe)
+            for root, _, files in os.walk(app_dir):
+                for f in files:
+                    if f.endswith(".ico"):
+                        shortcut.IconLocation = os.path.join(root, f)
+                        break
+                if getattr(shortcut, "IconLocation", None):
                     break
-            if getattr(shortcut, "IconLocation", None):
-                break
         shortcut.save()
         return True
     except Exception as e:
@@ -416,6 +421,7 @@ class AppCard(QFrame):
         self.is_hero = is_hero
         self._is_disabled = is_disabled
         self._pending_update_version = None
+        self._sm = SoundManager.instance()
         self.setAcceptDrops(True)
 
         if is_disabled:
@@ -497,7 +503,14 @@ class AppCard(QFrame):
         self._pending_update_version = new_version
         self._set_btn_state("update")
 
+    def enterEvent(self, event):
+        super().enterEvent(event)
+        if not self._is_disabled and hasattr(self, "_sm"):
+            self._sm.play("hover")
+
     def _show_options_menu(self):
+        if hasattr(self, "_sm"):
+            self._sm.play("click")
         menu = QMenu(self)
         is_dark = ThemeManager.instance().is_dark
         bg = "#1A1D27" if is_dark else "#FFFFFF"
@@ -725,6 +738,12 @@ class HubWindow(QMainWindow):
         self.search_input.textChanged.connect(self._filter_cards)
         header_layout.addWidget(self.search_input)
 
+        self.sound_btn = QPushButton()
+        self.sound_btn.setObjectName("hubSoundBtn")
+        self.sound_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sound_btn.clicked.connect(self._toggle_sound)
+        header_layout.addWidget(self.sound_btn)
+
         self.lang_btn = QPushButton()
         self.lang_btn.setObjectName("hubLangBtn")
         self.lang_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -881,6 +900,7 @@ class HubWindow(QMainWindow):
     # ── Card Handler ─────────────────────────────────────────────────────────
 
     def _handle_card(self, app_id: str):
+        SoundManager.instance().play("click")
         card = self._card_dict.get(app_id)
         if not card:
             return
@@ -939,6 +959,7 @@ class HubWindow(QMainWindow):
             card._status_label.setText(f"{pct}%")
 
     def _on_install_done(self, app_id: str, name: str):
+        SoundManager.instance().play("success")
         self._workers.pop(app_id, None)
         card = self._card_dict.get(app_id)
         if card:
@@ -1096,12 +1117,18 @@ class HubWindow(QMainWindow):
 
     # ── Theme ─────────────────────────────────────────────────────────────────
 
+    def _toggle_sound(self):
+        SoundManager.instance().toggle()
+        self._apply_theme()
+
     def _toggle_language(self):
+        SoundManager.instance().play("click")
         new_lang = "en" if get_current_language() == "es" else "es"
         save_current_language(new_lang)
         self._apply_theme()
 
     def _toggle_dark_mode(self):
+        SoundManager.instance().play("click")
         self._tm.toggle()
         self._apply_theme()
 
@@ -1115,6 +1142,12 @@ class HubWindow(QMainWindow):
         self.subtitle_label.setText(t("app_subtitle", version=curr))
         self.search_input.setPlaceholderText(t("search_placeholder"))
         self.search_input.setStyleSheet(styles.get("search_input", ""))
+
+        # Botón de sonido
+        sound_enabled = SoundManager.instance().is_enabled()
+        self.sound_btn.setStyleSheet(styles["toggle_btn"])
+        self.sound_btn.setText(t("btn_sound_on") if sound_enabled else t("btn_sound_off"))
+        self.sound_btn.setToolTip(t("btn_sound_tooltip"))
 
         # Botón de idioma
         curr_lang = get_current_language()
