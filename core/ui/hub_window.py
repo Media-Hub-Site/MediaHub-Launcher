@@ -532,74 +532,44 @@ class HubWindow(QMainWindow):
 
         main_layout.addLayout(header_layout)
 
-        # Bento Grid
+        # Bento Grid Dinámico y Escalable
         self.grid_layout = QGridLayout()
         self.grid_layout.setSpacing(16)
+        self._card_dict = {}
 
-        # 1. Hero Card: Multimedia Converter
-        self.media_card = AppCard(
-            card_id="media",
-            title="Multimedia Converter",
-            subtitle="Video, Audio e Imagen con 9 herramientas profesionales integradas (Corte, GIF, Compresión, Fusión).",
-            icon_file="media.png",
-            badge_text="9 EN 1",
-            is_hero=True
-        )
-        self.media_card.action_btn.clicked.connect(lambda: self._handle_card("media"))
+        # Generar tarjetas dinámicamente desde APP_REGISTRY
+        # Slot 0 (Hero): 0, 0 span (2, 1)
+        # Slots siguientes distribuidos en cuadrícula
+        slot_positions = [
+            (0, 1), (0, 2),
+            (1, 1), (1, 2),
+            (2, 0), (2, 1), (2, 2),
+            (3, 0), (3, 1), (3, 2)
+        ]
+        slot_idx = 0
 
-        # 2. Document Converter
-        self.docs_card = AppCard(
-            card_id="docs",
-            title="Document Converter",
-            subtitle="Conversión inteligente entre PDF, Word, Excel, PowerPoint e imágenes a 300 DPI.",
-            icon_file="docs.png",
-            badge_text="OFICINA"
-        )
-        self.docs_card.action_btn.clicked.connect(lambda: self._handle_card("docs"))
+        for app_id, meta in APP_REGISTRY.items():
+            is_hero = meta.get("is_hero", False)
+            is_disabled = meta.get("is_disabled", False)
+            card = AppCard(
+                card_id=app_id,
+                title=meta.get("name", app_id),
+                subtitle=meta.get("description", ""),
+                icon_file=meta.get("icon", "media.png"),
+                badge_text=meta.get("badge", ""),
+                is_hero=is_hero,
+                is_disabled=is_disabled
+            )
+            card.action_btn.clicked.connect(lambda checked, aid=app_id: self._handle_card(aid))
+            self._card_dict[app_id] = card
 
-        # 3. Link Converter
-        self.link_card = AppCard(
-            card_id="link",
-            title="Link Converter",
-            subtitle="Descarga por lotes desde YouTube, TikTok, Instagram y playlists con soporte paralelo.",
-            icon_file="link_converter.webp",
-            badge_text="BATCH"
-        )
-        self.link_card.action_btn.clicked.connect(lambda: self._handle_card("link"))
-
-        # 4. Image Tools
-        self.image_tools_card = AppCard(
-            card_id="image_tools",
-            title="Image Tools",
-            subtitle="Borrador de fondos, escalador y marca de agua en lote para tus fotografías.",
-            icon_file="quality.webp",
-            badge_text="CREATIVO"
-        )
-        self.image_tools_card.action_btn.clicked.connect(lambda: self._handle_card("image_tools"))
-
-        # 5. Subtitle Generator
-        self.subtitle_card = AppCard(
-            card_id="subtitle",
-            title="Subtitle Generator",
-            subtitle="Transcripción y generación automática de subtítulos con Whisper AI de forma local.",
-            icon_file="subtitle.png",
-            badge_text="IA LOCAL"
-        )
-        self.subtitle_card.action_btn.clicked.connect(lambda: self._handle_card("subtitle"))
-
-        self._card_dict = {
-            "media":       self.media_card,
-            "docs":        self.docs_card,
-            "link":        self.link_card,
-            "image_tools": self.image_tools_card,
-            "subtitle":    self.subtitle_card,
-        }
-
-        self.grid_layout.addWidget(self.media_card, 0, 0, 2, 1)
-        self.grid_layout.addWidget(self.docs_card, 0, 1)
-        self.grid_layout.addWidget(self.link_card, 0, 2)
-        self.grid_layout.addWidget(self.image_tools_card, 1, 1)
-        self.grid_layout.addWidget(self.subtitle_card, 1, 2)
+            if is_hero:
+                self.grid_layout.addWidget(card, 0, 0, 2, 1)
+            else:
+                if slot_idx < len(slot_positions):
+                    r, c = slot_positions[slot_idx]
+                    self.grid_layout.addWidget(card, r, c)
+                    slot_idx += 1
 
         self.grid_layout.setColumnStretch(0, 11)
         self.grid_layout.setColumnStretch(1, 10)
