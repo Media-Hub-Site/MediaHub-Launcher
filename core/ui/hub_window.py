@@ -163,15 +163,19 @@ def create_desktop_shortcut(app_id: str) -> bool:
         shortcut.TargetPath = exe
         shortcut.WorkingDirectory = os.path.dirname(exe)
         shortcut.Description = APP_REGISTRY.get(app_id, {}).get("description", "")
-        # Buscar icono si existe
-        app_dir = os.path.dirname(exe)
-        for root, _, files in os.walk(app_dir):
-            for f in files:
-                if f.endswith(".ico"):
-                    shortcut.IconLocation = os.path.join(root, f)
+        # Buscar icono específico de la app en launcher assets o en el directorio de la app
+        icon_path = get_asset_path(f"../icons/{app_id}.ico")
+        if os.path.isfile(icon_path):
+            shortcut.IconLocation = os.path.abspath(icon_path)
+        else:
+            app_dir = os.path.dirname(exe)
+            for root, _, files in os.walk(app_dir):
+                for f in files:
+                    if f.endswith(".ico"):
+                        shortcut.IconLocation = os.path.join(root, f)
+                        break
+                if getattr(shortcut, "IconLocation", None):
                     break
-            if getattr(shortcut, "IconLocation", None):
-                break
         shortcut.save()
         return True
     except Exception as e:
