@@ -1,3 +1,4 @@
+import webbrowser
 import os
 import sys
 import json
@@ -13,7 +14,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QGridLayout, QFrame,
     QGraphicsDropShadowEffect, QMessageBox, QApplication,
-    QMenu
+    QMenu, QLineEdit, QScrollArea
 )
 from PyQt6.QtGui import QPixmap, QIcon, QColor, QDrag, QAction
 from PyQt6.QtCore import QMimeData, Qt, QSize, QThread, pyqtSignal
@@ -115,6 +116,107 @@ def get_app_exe(app_id: str) -> str | None:
     return None
 
 
+def get_desktop_path() -> str:
+    """Retorna la ruta absoluta del Escritorio del usuario (soporta OneDrive y Windows local)."""
+    try:
+        import win32com.client
+        shell = win32com.client.Dispatch("WScript.Shell")
+        desk = shell.SpecialFolders("Desktop")
+        if os.path.isdir(desk):
+            return desk
+    except Exception:
+        pass
+    home = os.environ.get("USERPROFILE") or os.path.expanduser("~")
+    onedrive_desk = os.path.join(home, "OneDrive", "Desktop")
+    if os.path.isdir(onedrive_desk):
+        return onedrive_desk
+    standard_desk = os.path.join(home, "Desktop")
+    return standard_desk
+
+
+def get_desktop_shortcut_path(app_id: str) -> str:
+    """Devuelve la ruta del archivo .lnk de acceso directo para la aplicación en el Escritorio."""
+    reg = APP_REGISTRY.get(app_id, {})
+    name = reg.get("name", app_id)
+    # Sanitizar nombre para archivo
+    safe_name = "".join(c for c in name if c.isalnum() or c in (" ", "-", "_")).strip()
+    return os.path.join(get_desktop_path(), f"{safe_name}.lnk")
+
+
+def has_desktop_shortcut(app_id: str) -> bool:
+    """Verifica si ya existe el acceso directo en el Escritorio."""
+    return os.path.isfile(get_desktop_shortcut_path(app_id))
+
+
+def create_desktop_shortcut(app_id: str) -> bool:
+    """Crea un acceso directo en el Escritorio para la aplicación instalada."""
+    exe = get_app_exe(app_id)
+    if not exe or not os.path.isfile(exe):
+        return False
+    try:
+        import win32com.client
+        shell = win32com.client.Dispatch("WScript.Shell")
+        lnk_path = get_desktop_shortcut_path(app_id)
+        shortcut = shell.CreateShortcut(lnk_path)
+        shortcut.TargetPath = exe
+        shortcut.WorkingDirectory = os.path.dirname(exe)
+        shortcut.Description = APP_REGISTRY.get(app_id, {}).get("description", "")
+        # Buscar icono si existe
+        app_dir = os.path.dirname(exe)
+        for root, _, files in os.walk(app_dir):
+            for f in files:
+                if f.endswith(".ico"):
+                    shortcut.IconLocation = os.path.join(root, f)
+                    break
+            if getattr(shortcut, "IconLocation", None):
+                break
+        shortcut.save()
+        return True
+    except Exception as e:
+        print(f"Error creando acceso directo para {app_id}: {e}")
+        return False
+
+
+def remove_desktop_shortcut(app_id: str) -> bool:
+    """Elimina el acceso directo del Escritorio si existe."""
+    lnk_path = get_desktop_shortcut_path(app_id)
+    if os.path.isfile(lnk_path):
+        try:
+            os.remove(lnk_path)
+            return True
+        except Exception as e:
+            print(f"Error eliminando acceso directo {lnk_path}: {e}")
+            return False
+    return False
+
+
+def get_sizes_cache_file() -> str:
+    """Archivo JSON para cachear los tamaños de release de cada app."""
+    return os.path.join(get_hub_data_dir(), "app_sizes.json")
+
+
+def load_cached_sizes() -> dict:
+    """Carga diccionario con {app_id: size_str}."""
+    fpath = get_sizes_cache_file()
+    if os.path.isfile(fpath):
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+
+def save_cached_sizes(sizes: dict):
+    """Guarda caché de tamaños de apps."""
+    fpath = get_sizes_cache_file()
+    try:
+        with open(fpath, "w", encoding="utf-8") as f:
+            json.dump(sizes, f, indent=2)
+    except Exception as e:
+        print(f"Error guardando cache de tamaños: {e}")
+
+
 def launch_app(app_id: str):
     """Lanza la micro-app instalada como proceso independiente del sistema."""
     exe = get_app_exe(app_id)
@@ -161,6 +263,39 @@ class CheckMicroAppUpdatesThread(QThread):
                             self.update_found.emit(app_id, tag)
             except Exception:
                 pass
+
+
+class FetchAppSizesThread(QThread):
+    """Consulta en segundo plano el tamaño de descarga/release de cada app desde GitHub."""
+    sizes_fetched = pyqtSignal(dict)  # {app_id: "143 MB"}
+
+    def run(self):
+        sizes = load_cached_sizes()
+        changed = False
+        for app_id, reg in APP_REGISTRY.items():
+            repo = reg.get("repo")
+            if not repo or reg.get("is_disabled"):
+                continue
+            try:
+                url = f"https://api.github.com/repos/{repo}/releases/latest"
+                resp = requests.get(url, timeout=6)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    for asset in data.get("assets", []):
+                        if asset.get("name", "").endswith((".zip", ".exe")):
+                            sz_bytes = asset.get("size", 0)
+                            if sz_bytes > 0:
+                                mb = sz_bytes / (1024 * 1024)
+                                sz_str = f"{mb:.1f} MB" if mb < 1024 else f"{mb/1024:.2f} GB"
+                                if sizes.get(app_id) != sz_str:
+                                    sizes[app_id] = sz_str
+                                    changed = True
+                            break
+            except Exception:
+                pass
+        if changed:
+            save_cached_sizes(sizes)
+        self.sizes_fetched.emit(sizes)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -265,10 +400,13 @@ class AppCard(QFrame):
 
         if is_disabled:
             self.setObjectName("appCardDisabled")
+            self.setMinimumHeight(200)
         elif is_hero:
             self.setObjectName("appCardHero")
+            self.setMinimumHeight(416)
         else:
             self.setObjectName("appCard")
+            self.setMinimumHeight(200)
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(22, 20, 22, 20)
@@ -367,6 +505,15 @@ class AppCard(QFrame):
             }}
         """)
 
+        if has_desktop_shortcut(self.card_id):
+            shortcut_act = menu.addAction("🔗  Quitar acceso directo")
+            shortcut_act.triggered.connect(lambda: self.window()._remove_shortcut(self.card_id))
+        else:
+            shortcut_act = menu.addAction("📌  Crear acceso directo")
+            shortcut_act.triggered.connect(lambda: self.window()._create_shortcut(self.card_id))
+
+        menu.addSeparator()
+
         reinstall_act = menu.addAction("🔄  Reinstalar")
         reinstall_act.triggered.connect(lambda: self.window()._reinstall_app(self.card_id))
 
@@ -395,21 +542,25 @@ class AppCard(QFrame):
         installed = load_installed_versions()
         cur_ver = installed.get(self.card_id)
 
+        cached_sizes = load_cached_sizes()
+        size_str = cached_sizes.get(self.card_id, "")
+        size_suffix = f" • {size_str}" if size_str else ""
+
         if state == "open":
             self.action_btn.setText("Abrir")
             self.action_btn.setEnabled(True)
             v_text = f"v{cur_ver}" if cur_ver else ""
-            self._status_label.setText(f"● Listo {v_text}".strip())
+            self._status_label.setText(f"● Listo {v_text}{size_suffix}".strip())
             self.options_btn.show()
         elif state == "update":
             self.action_btn.setText("Actualizar")
             self.action_btn.setEnabled(True)
-            self._status_label.setText(f"↑ v{self._pending_update_version}")
+            self._status_label.setText(f"↑ v{self._pending_update_version}{size_suffix}")
             self.options_btn.show()
         elif state == "install":
             self.action_btn.setText("Instalar")
             self.action_btn.setEnabled(True)
-            self._status_label.setText("No instalada")
+            self._status_label.setText(f"No instalada{size_suffix}")
             self.options_btn.hide()
         else:
             self.action_btn.setText("Próximamente")
@@ -458,7 +609,7 @@ class HubWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Media Hub")
         self.setMinimumSize(940, 620)
-        self.resize(980, 650)
+        self.resize(980, 680)
         self._tm = ThemeManager.instance()
         self._workers: dict[str, InstallWorker] = {}
         self.init_ui()
@@ -475,6 +626,11 @@ class HubWindow(QMainWindow):
         self.micro_apps_updater.update_found.connect(self._on_micro_app_update_found)
         self.micro_apps_updater.start()
 
+        # 3. Consulta de tamaño de cada aplicación (Issue #4)
+        self.sizes_thread = FetchAppSizesThread(self)
+        self.sizes_thread.sizes_fetched.connect(self._on_app_sizes_fetched)
+        self.sizes_thread.start()
+
     def show_update_dialog(self, version, description, download_url, size_mb):
         dialog = UpdateDialog(version, description, download_url, size_mb, self)
         dialog.exec()
@@ -490,6 +646,12 @@ class HubWindow(QMainWindow):
             card.set_update_available(new_version)
             card.apply_styles(self._tm.hub_styles())
         self._update_dock_status()
+
+    def _on_app_sizes_fetched(self, sizes: dict):
+        """Actualiza el texto de las tarjetas con el tamaño real de cada app."""
+        for card in self._card_dict.values():
+            card.refresh_state()
+            card.apply_styles(self._tm.hub_styles())
 
     # ── UI Layout ─────────────────────────────────────────────────────────────
 
@@ -517,6 +679,14 @@ class HubWindow(QMainWindow):
         header_layout.addLayout(header_text_layout)
         header_layout.addStretch()
 
+        # Barra de Búsqueda Rápida de Herramientas
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("🔍 Filtrar herramientas...")
+        self.search_input.setFixedWidth(200)
+        self.search_input.setFixedHeight(34)
+        self.search_input.textChanged.connect(self._filter_cards)
+        header_layout.addWidget(self.search_input)
+
         self.toggle_btn = QPushButton()
         self.toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.toggle_btn.clicked.connect(self._toggle_dark_mode)
@@ -524,80 +694,65 @@ class HubWindow(QMainWindow):
 
         main_layout.addLayout(header_layout)
 
-        # Bento Grid
-        self.grid_layout = QGridLayout()
+        # Bento Grid Dinámico y Escalable con Scroll
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setObjectName("hubScrollArea")
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scroll_area.verticalScrollBar().setSingleStep(20)
+
+        self.scroll_content = QWidget()
+        self.scroll_content.setObjectName("hubScrollContent")
+        self.scroll_content.setStyleSheet("background: transparent;")
+
+        self.grid_layout = QGridLayout(self.scroll_content)
         self.grid_layout.setSpacing(16)
+        self.grid_layout.setContentsMargins(0, 2, 8, 2)
+        self.grid_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self._card_dict = {}
 
-        # 1. Hero Card: Multimedia Converter
-        self.media_card = AppCard(
-            card_id="media",
-            title="Multimedia Converter",
-            subtitle="Video, Audio e Imagen con 9 herramientas profesionales integradas (Corte, GIF, Compresión, Fusión).",
-            icon_file="media.png",
-            badge_text="9 EN 1",
-            is_hero=True
-        )
-        self.media_card.action_btn.clicked.connect(lambda: self._handle_card("media"))
+        # Generar tarjetas dinámicamente desde APP_REGISTRY
+        # Slot 0 (Hero): 0, 0 span (2, 1)
+        # Slots siguientes distribuidos en cuadrícula
+        slot_positions = [
+            (0, 1), (0, 2),
+            (1, 1), (1, 2),
+            (2, 0), (2, 1), (2, 2),
+            (3, 0), (3, 1), (3, 2)
+        ]
+        slot_idx = 0
 
-        # 2. Document Converter
-        self.docs_card = AppCard(
-            card_id="docs",
-            title="Document Converter",
-            subtitle="Conversión inteligente entre PDF, Word, Excel, PowerPoint e imágenes a 300 DPI.",
-            icon_file="docs.png",
-            badge_text="OFICINA"
-        )
-        self.docs_card.action_btn.clicked.connect(lambda: self._handle_card("docs"))
+        for app_id, meta in APP_REGISTRY.items():
+            is_hero = meta.get("is_hero", False)
+            is_disabled = meta.get("is_disabled", False)
+            card = AppCard(
+                card_id=app_id,
+                title=meta.get("name", app_id),
+                subtitle=meta.get("description", ""),
+                icon_file=meta.get("icon", "media.png"),
+                badge_text=meta.get("badge", ""),
+                is_hero=is_hero,
+                is_disabled=is_disabled
+            )
+            card.action_btn.clicked.connect(lambda checked, aid=app_id: self._handle_card(aid))
+            self._card_dict[app_id] = card
 
-        # 3. Link Converter
-        self.link_card = AppCard(
-            card_id="link",
-            title="Link Converter",
-            subtitle="Descarga por lotes desde YouTube, TikTok, Instagram y playlists con soporte paralelo.",
-            icon_file="link_converter.webp",
-            badge_text="BATCH"
-        )
-        self.link_card.action_btn.clicked.connect(lambda: self._handle_card("link"))
-
-        # 4. Image Tools
-        self.image_tools_card = AppCard(
-            card_id="image_tools",
-            title="Image Tools",
-            subtitle="Borrador de fondos, escalador y marca de agua en lote para tus fotografías.",
-            icon_file="quality.webp",
-            badge_text="CREATIVO"
-        )
-        self.image_tools_card.action_btn.clicked.connect(lambda: self._handle_card("image_tools"))
-
-        # 5. Subtitle Generator
-        self.subtitle_card = AppCard(
-            card_id="subtitle",
-            title="Subtitle Generator",
-            subtitle="Transcripción y generación automática de subtítulos con Whisper AI de forma local.",
-            icon_file="subtitle.png",
-            badge_text="IA LOCAL"
-        )
-        self.subtitle_card.action_btn.clicked.connect(lambda: self._handle_card("subtitle"))
-
-        self._card_dict = {
-            "media":       self.media_card,
-            "docs":        self.docs_card,
-            "link":        self.link_card,
-            "image_tools": self.image_tools_card,
-            "subtitle":    self.subtitle_card,
-        }
-
-        self.grid_layout.addWidget(self.media_card, 0, 0, 2, 1)
-        self.grid_layout.addWidget(self.docs_card, 0, 1)
-        self.grid_layout.addWidget(self.link_card, 0, 2)
-        self.grid_layout.addWidget(self.image_tools_card, 1, 1)
-        self.grid_layout.addWidget(self.subtitle_card, 1, 2)
+            if is_hero:
+                self.grid_layout.addWidget(card, 0, 0, 2, 1)
+            else:
+                if slot_idx < len(slot_positions):
+                    r, c = slot_positions[slot_idx]
+                    self.grid_layout.addWidget(card, r, c)
+                    slot_idx += 1
 
         self.grid_layout.setColumnStretch(0, 11)
         self.grid_layout.setColumnStretch(1, 10)
         self.grid_layout.setColumnStretch(2, 10)
 
-        main_layout.addLayout(self.grid_layout)
+        self.scroll_area.setWidget(self.scroll_content)
+        main_layout.addWidget(self.scroll_area, 1)
 
         # Footer Dock Bento
         self.footer_dock = QFrame()
@@ -610,6 +765,13 @@ class HubWindow(QMainWindow):
         dock_layout.addWidget(self.dock_status_label)
         dock_layout.addStretch()
 
+        self.feedback_btn = QPushButton("💬 Encuesta de Satisfacción")
+        self.feedback_btn.setObjectName("dockLink")
+        self.feedback_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.feedback_btn.setToolTip("Danos tu opinión o reporta errores para seguir mejorando Media Hub")
+        self.feedback_btn.clicked.connect(self._open_feedback_form)
+        dock_layout.addWidget(self.feedback_btn)
+
         self.dock_folder_btn = QPushButton("📁 Abrir carpeta de apps")
         self.dock_folder_btn.setObjectName("dockLink")
         self.dock_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -618,6 +780,24 @@ class HubWindow(QMainWindow):
 
         main_layout.addWidget(self.footer_dock)
         self._update_dock_status()
+
+    def _filter_cards(self, query: str):
+        query = query.strip().lower()
+        for app_id, card in self._card_dict.items():
+            reg = APP_REGISTRY.get(app_id, {})
+            name = reg.get("name", "").lower()
+            desc = reg.get("description", "").lower()
+            match = (not query) or (query in name) or (query in desc) or (query in app_id)
+            card.setVisible(match)
+
+    def _open_feedback_form(self):
+        try:
+            webbrowser.open("https://forms.gle/ECL2mwc8iH5UXkos9")
+        except Exception as e:
+            QMessageBox.information(
+                self, "Encuesta de Satisfacción",
+                f"Puedes acceder a la encuesta desde tu navegador en:\nhttps://forms.gle/ECL2mwc8iH5UXkos9"
+            )
 
     def _open_apps_folder(self):
         path = get_apps_install_dir()
@@ -632,10 +812,25 @@ class HubWindow(QMainWindow):
         total = len(APP_REGISTRY)
         updates_pending = sum(1 for c in self._card_dict.values() if getattr(c, "_pending_update_version", None))
 
+        # Calcular tamaño ocupado en ~/.mediahub/apps
+        apps_dir = get_apps_install_dir()
+        size_mb = 0.0
+        try:
+            for root, dirs, files in os.walk(apps_dir):
+                for f in files:
+                    fp = os.path.join(root, f)
+                    if os.path.isfile(fp):
+                        size_mb += os.path.getsize(fp)
+            size_mb = size_mb / (1024 * 1024)
+        except Exception:
+            pass
+
+        size_str = f"{size_mb:.1f} MB" if size_mb < 1024 else f"{size_mb/1024:.2f} GB"
+
         if updates_pending > 0:
-            self.dock_status_label.setText(f"🚀 Hay {updates_pending} actualización(es) disponible(s) para tus herramientas.")
+            self.dock_status_label.setText(f"🚀 Hay {updates_pending} actualización(es) disponible(s) • Ocupado: {size_str}")
         else:
-            self.dock_status_label.setText(f"✓ {count} de {total} herramientas instaladas • Almacenamiento optimizado")
+            self.dock_status_label.setText(f"✓ {count} de {total} herramientas instaladas • {size_str} en disco")
 
     # ── Card Handler ─────────────────────────────────────────────────────────
 
@@ -682,11 +877,29 @@ class HubWindow(QMainWindow):
             styles = self._tm.hub_styles()
             card.apply_styles(styles)
         self._update_dock_status()
-        QMessageBox.information(
-            self, "Operación exitosa",
-            f"✅ {name} se ha instalado/actualizado correctamente.\n"
-            f"Ya puedes usar la versión más reciente."
-        )
+        
+        # Preguntar al usuario si desea crear un acceso directo en el escritorio (Issue #3)
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Instalación completada")
+        msg_box.setText(f"✅ <b>{name}</b> se ha instalado correctamente.")
+        msg_box.setInformativeText("¿Deseas crear un acceso directo en tu Escritorio para abrirla de forma independiente?")
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        msg_box.setDefaultButton(QMessageBox.StandardButton.Yes)
+        yes_btn = msg_box.button(QMessageBox.StandardButton.Yes)
+        if yes_btn:
+            yes_btn.setText("Sí, crear acceso directo")
+        no_btn = msg_box.button(QMessageBox.StandardButton.No)
+        if no_btn:
+            no_btn.setText("No, gracias")
+        
+        reply = msg_box.exec()
+        if reply == QMessageBox.StandardButton.Yes:
+            if create_desktop_shortcut(app_id):
+                QMessageBox.information(
+                    self, "Acceso Directo Creado",
+                    f"📌 Se ha creado el acceso directo de <b>{name}</b> en tu Escritorio.\n"
+                    "Puedes abrir la aplicación directamente cuando quieras sin abrir el Launcher."
+                )
 
     def _on_install_error(self, app_id: str, err: str):
         self._workers.pop(app_id, None)
@@ -710,6 +923,29 @@ class HubWindow(QMainWindow):
         )
         if reply == QMessageBox.StandardButton.Yes:
             self._start_install_or_update(app_id)
+
+    def _create_shortcut(self, app_id: str):
+        reg = APP_REGISTRY.get(app_id, {})
+        name = reg.get("name", app_id)
+        if create_desktop_shortcut(app_id):
+            QMessageBox.information(
+                self, "Acceso directo creado",
+                f"📌 Se creó el acceso directo de <b>{name}</b> en tu Escritorio."
+            )
+        else:
+            QMessageBox.warning(
+                self, "Aviso",
+                f"No se pudo crear el acceso directo para {name}."
+            )
+
+    def _remove_shortcut(self, app_id: str):
+        reg = APP_REGISTRY.get(app_id, {})
+        name = reg.get("name", app_id)
+        if remove_desktop_shortcut(app_id):
+            QMessageBox.information(
+                self, "Acceso directo eliminado",
+                f"🗑️ Se eliminó el acceso directo de <b>{name}</b> del Escritorio."
+            )
 
     def _uninstall_app(self, app_id: str):
         reg = APP_REGISTRY.get(app_id)
@@ -735,6 +971,7 @@ class HubWindow(QMainWindow):
             if os.path.exists(app_dir):
                 shutil.rmtree(app_dir)
             remove_installed_version(app_id)
+            remove_desktop_shortcut(app_id)
             card = self._card_dict.get(app_id)
             if card:
                 card._pending_update_version = None
@@ -765,9 +1002,11 @@ class HubWindow(QMainWindow):
         self.setStyleSheet(styles["window"])
         self.title_label.setStyleSheet(styles["title"])
         self.subtitle_label.setStyleSheet(styles["header_sub"])
+        self.search_input.setStyleSheet(styles.get("search_input", ""))
         self.toggle_btn.setStyleSheet(styles["toggle_btn"])
         self.toggle_btn.setText(
             "☀️  Modo Claro" if self._tm.is_dark else "🌙  Modo Oscuro")
+        self.scroll_area.setStyleSheet(styles.get("scroll_area", ""))
         self.footer_dock.setStyleSheet(styles["dock"])
 
         for card in self._card_dict.values():
