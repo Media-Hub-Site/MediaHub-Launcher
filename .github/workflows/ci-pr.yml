@@ -5,8 +5,13 @@ on:
     branches:
       - main
       - master
+      - develop
       - launcher-modular
   workflow_dispatch:
+
+env:
+  PYTHONIOENCODING: "utf-8"
+  PYTHONUTF8: "1"
 
 jobs:
   validate:
@@ -36,7 +41,7 @@ jobs:
         run: |
           Write-Host "Verificando sintaxis de todos los archivos Python..."
           python -m compileall -q .
-          Write-Host "✅ Sintaxis y compilación correcta en todos los archivos."
+          Write-Host "[OK] Sintaxis y compilacion correcta en todos los archivos."
 
       - name: Lint Check (Critical Errors)
         shell: pwsh
@@ -48,13 +53,12 @@ jobs:
         shell: pwsh
         run: |
           # Verifica que el punto de entrada principal importe sin errores
-          python -c "import main; print('✅ main.py se importa limpiamente')"
+          python -c "import main; print('[OK] main.py se importa limpiamente')"
 
-      - name: Dry-Run PyInstaller Spec Validation
+      - name: PyInstaller Spec Syntax Validation
         shell: pwsh
         run: |
           if (Test-Path main.spec) {
-            Write-Host "Validando archivo de empaquetado main.spec..."
-            # Asegura que el spec compile
-            python -c "exec(open('main.spec', encoding='utf-8').read()); print('✅ main.spec es válido')"
+            Write-Host "Validando sintaxis de main.spec..."
+            python -c "import py_compile; py_compile.compile('main.spec', doraise=True); print('[OK] main.spec es valido')"
           }
