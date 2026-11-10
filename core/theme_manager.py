@@ -82,6 +82,12 @@ _HUB_LIGHT = {
     "options_fg":       "#374151",
     "options_border":   "#E5E7EB",
     "options_hover":    "#E5E7EB",
+    "scroll_thumb":     "#D1D5DB",
+    "scroll_thumb_hover":"#9CA3AF",
+    "search_bg":        "#FFFFFF",
+    "search_fg":        "#111827",
+    "search_border":    "#E5E7EB",
+    "search_focus":     "#2563EB",
 }
 
 _HUB_DARK = {
@@ -125,6 +131,12 @@ _HUB_DARK = {
     "options_fg":       "#E2E8F0",
     "options_border":   "#272B3B",
     "options_hover":    "#2B3042",
+    "scroll_thumb":     "#2E3547",
+    "scroll_thumb_hover":"#47526D",
+    "search_bg":        "#151720",
+    "search_fg":        "#F3F4F6",
+    "search_border":    "#272B3B",
+    "search_focus":     "#3B82F6",
 }
 
 
@@ -496,6 +508,51 @@ def _build_hub_styles(h: dict) -> dict:
         }}
     """
 
+    scroll_area = f"""
+        QScrollArea {{
+            background: transparent;
+            background-color: transparent;
+            border: none;
+        }}
+        QScrollBar:vertical {{
+            border: none;
+            background: transparent;
+            width: 8px;
+            margin: 0px 2px 0px 0px;
+            border-radius: 4px;
+        }}
+        QScrollBar::handle:vertical {{
+            background-color: {h['scroll_thumb']};
+            min-height: 36px;
+            border-radius: 4px;
+        }}
+        QScrollBar::handle:vertical:hover {{
+            background-color: {h['scroll_thumb_hover']};
+        }}
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+            height: 0px;
+            background: none;
+            border: none;
+        }}
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+            background: none;
+        }}
+    """
+
+    search_input = f"""
+        QLineEdit {{
+            background-color: {h['search_bg']};
+            color: {h['search_fg']};
+            border: 1px solid {h['search_border']};
+            border-radius: 10px;
+            padding: 4px 10px;
+            font-size: 9.5pt;
+        }}
+        QLineEdit:focus {{
+            border: 1px solid {h['search_focus']};
+        }}
+    """
+
     return {
         "window":           window,
         "title":            title,
@@ -518,6 +575,8 @@ def _build_hub_styles(h: dict) -> dict:
         "status_update":    status_update,
         "toggle_btn":       toggle,
         "dock":             dock,
+        "scroll_area":      scroll_area,
+        "search_input":     search_input,
     }
 
 

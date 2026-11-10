@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QGridLayout, QFrame,
     QGraphicsDropShadowEffect, QMessageBox, QApplication,
-    QMenu, QLineEdit
+    QMenu, QLineEdit, QScrollArea
 )
 from PyQt6.QtGui import QPixmap, QIcon, QColor, QDrag, QAction
 from PyQt6.QtCore import QMimeData, Qt, QSize, QThread, pyqtSignal
@@ -266,10 +266,13 @@ class AppCard(QFrame):
 
         if is_disabled:
             self.setObjectName("appCardDisabled")
+            self.setMinimumHeight(200)
         elif is_hero:
             self.setObjectName("appCardHero")
+            self.setMinimumHeight(416)
         else:
             self.setObjectName("appCard")
+            self.setMinimumHeight(200)
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(22, 20, 22, 20)
@@ -459,7 +462,7 @@ class HubWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Media Hub")
         self.setMinimumSize(940, 620)
-        self.resize(980, 650)
+        self.resize(980, 680)
         self._tm = ThemeManager.instance()
         self._workers: dict[str, InstallWorker] = {}
         self.init_ui()
@@ -533,9 +536,23 @@ class HubWindow(QMainWindow):
 
         main_layout.addLayout(header_layout)
 
-        # Bento Grid Dinámico y Escalable
-        self.grid_layout = QGridLayout()
+        # Bento Grid Dinámico y Escalable con Scroll
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setObjectName("hubScrollArea")
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scroll_area.verticalScrollBar().setSingleStep(20)
+
+        self.scroll_content = QWidget()
+        self.scroll_content.setObjectName("hubScrollContent")
+        self.scroll_content.setStyleSheet("background: transparent;")
+
+        self.grid_layout = QGridLayout(self.scroll_content)
         self.grid_layout.setSpacing(16)
+        self.grid_layout.setContentsMargins(0, 2, 8, 2)
+        self.grid_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self._card_dict = {}
 
         # Generar tarjetas dinámicamente desde APP_REGISTRY
@@ -576,7 +593,8 @@ class HubWindow(QMainWindow):
         self.grid_layout.setColumnStretch(1, 10)
         self.grid_layout.setColumnStretch(2, 10)
 
-        main_layout.addLayout(self.grid_layout)
+        self.scroll_area.setWidget(self.scroll_content)
+        main_layout.addWidget(self.scroll_area, 1)
 
         # Footer Dock Bento
         self.footer_dock = QFrame()
@@ -784,9 +802,11 @@ class HubWindow(QMainWindow):
         self.setStyleSheet(styles["window"])
         self.title_label.setStyleSheet(styles["title"])
         self.subtitle_label.setStyleSheet(styles["header_sub"])
+        self.search_input.setStyleSheet(styles.get("search_input", ""))
         self.toggle_btn.setStyleSheet(styles["toggle_btn"])
         self.toggle_btn.setText(
             "☀️  Modo Claro" if self._tm.is_dark else "🌙  Modo Oscuro")
+        self.scroll_area.setStyleSheet(styles.get("scroll_area", ""))
         self.footer_dock.setStyleSheet(styles["dock"])
 
         for card in self._card_dict.values():
