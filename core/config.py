@@ -163,7 +163,7 @@ APP_REGISTRY = {
         "description_en": "Financial management, expense tracking, budgets and real-time cash balance.",
         "description":    "Gestión financiera, seguimiento de gastos, presupuestos y balance en tiempo real.",
         "repo":           f"{ORG_NAME}/MediaHub-GestorPresupuestario",
-        "exe":            "GestorDePresupuesto.exe",
+        "exe":            "GestorPresupuestario.exe",
         "dir":            "MediaHub-GestorPresupuestario",
         "icon":           "presupuesto.png",
         "badge_es":       "FINANZAS",
