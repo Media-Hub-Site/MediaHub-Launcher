@@ -1,3 +1,4 @@
+import webbrowser
 import os
 import sys
 import json
@@ -588,6 +589,13 @@ class HubWindow(QMainWindow):
         dock_layout.addWidget(self.dock_status_label)
         dock_layout.addStretch()
 
+        self.feedback_btn = QPushButton("💬 Encuesta de Satisfacción")
+        self.feedback_btn.setObjectName("dockLink")
+        self.feedback_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.feedback_btn.setToolTip("Danos tu opinión o reporta errores para seguir mejorando Media Hub")
+        self.feedback_btn.clicked.connect(self._open_feedback_form)
+        dock_layout.addWidget(self.feedback_btn)
+
         self.dock_folder_btn = QPushButton("📁 Abrir carpeta de apps")
         self.dock_folder_btn.setObjectName("dockLink")
         self.dock_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -605,6 +613,15 @@ class HubWindow(QMainWindow):
             desc = reg.get("description", "").lower()
             match = (not query) or (query in name) or (query in desc) or (query in app_id)
             card.setVisible(match)
+
+    def _open_feedback_form(self):
+        try:
+            webbrowser.open("https://forms.gle/ECL2mwc8iH5UXkos9")
+        except Exception as e:
+            QMessageBox.information(
+                self, "Encuesta de Satisfacción",
+                f"Puedes acceder a la encuesta desde tu navegador en:\nhttps://forms.gle/ECL2mwc8iH5UXkos9"
+            )
 
     def _open_apps_folder(self):
         path = get_apps_install_dir()
