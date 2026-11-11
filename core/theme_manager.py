@@ -315,7 +315,7 @@ def _build_hub_styles(h: dict) -> dict:
     header_sub = f"""
         QLabel#hubSubtitle {{
             color: {h['header_sub']};
-            font-size: 10.5pt;
+            font-size: 10pt;
             font-weight: 500;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }}
