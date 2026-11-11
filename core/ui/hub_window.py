@@ -343,8 +343,14 @@ class InstallWorker(QThread):
         repo = reg["repo"]
         api_url = f"https://api.github.com/repos/{repo}/releases/latest"
 
+        # Headers con User-Agent estándar para evitar bloqueos y token si está disponible
+        headers = {"User-Agent": "MediaHub-Launcher"}
+        token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
         try:
-            r = requests.get(api_url, timeout=10)
+            r = requests.get(api_url, headers=headers, timeout=10)
             r.raise_for_status()
             release = r.json()
         except Exception as e:
