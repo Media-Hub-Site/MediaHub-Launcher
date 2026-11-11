@@ -695,7 +695,7 @@ class HubWindow(QMainWindow):
     def _on_launcher_version_detected(self, latest_ver: str):
         # Si la versión local es menor o coincide, actualizamos el header
         curr = get_launcher_version()
-        self.subtitle_label.setText(f"Suite integral de herramientas y conversores multimedia • {curr}")
+        self.subtitle_label.setText(t("app_subtitle", version=curr))
 
     def _on_micro_app_update_found(self, app_id: str, new_version: str):
         card = self._card_dict.get(app_id)
@@ -739,7 +739,7 @@ class HubWindow(QMainWindow):
         # Barra de Búsqueda Rápida de Herramientas
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(t("search_placeholder"))
-        self.search_input.setFixedWidth(200)
+        self.search_input.setFixedWidth(160)
         self.search_input.setFixedHeight(34)
         self.search_input.textChanged.connect(self._filter_cards)
         header_layout.addWidget(self.search_input)
