@@ -187,6 +187,22 @@ APP_REGISTRY = {
         "badge":          "PLANOS",
         "is_disabled":    False,
     },
+    "audiolab": {
+        "name_es":        "AudioLab",
+        "name_en":        "AudioLab",
+        "name":           "AudioLab",
+        "description_es": "Laboratorio de síntesis matemática, fórmulas Bytebeat y efectos procedurales SFX.",
+        "description_en": "Mathematical sound synthesis studio, Bytebeat formulas and procedural SFX.",
+        "description":    "Laboratorio de síntesis matemática, fórmulas Bytebeat y efectos procedurales SFX.",
+        "repo":           f"{ORG_NAME}/MediaHub-AudioLab",
+        "exe":            "AudioLab.exe",
+        "dir":            "MediaHub-AudioLab",
+        "icon":           "audiolab.png",
+        "badge_es":       "SÍNTESIS",
+        "badge_en":       "SYNTH",
+        "badge":          "SÍNTESIS",
+        "is_disabled":    False,
+    },
     # ── Casillas de Escalabilidad Futura (Próximamente) ───────────────
     "streamer_hub": {
         "name_es":        "StreamerHub",
