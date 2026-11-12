@@ -203,6 +203,22 @@ APP_REGISTRY = {
         "badge":          "SÍNTESIS",
         "is_disabled":    False,
     },
+    "blueguard": {
+        "name_es":        "BlueGuard",
+        "name_en":        "BlueGuard",
+        "name":           "BlueGuard",
+        "description_es": "Asistente Blue Team de ciberseguridad, puertos, red y logs traducidos en tiempo real.",
+        "description_en": "Real-time Blue Team cybersecurity assistant for network, ports and system logs.",
+        "description":    "Asistente Blue Team de ciberseguridad, puertos, red y logs traducidos en tiempo real.",
+        "repo":           f"{ORG_NAME}/MediaHub-BlueGuard",
+        "exe":            "BlueGuard.exe",
+        "dir":            "MediaHub-BlueGuard",
+        "icon":           "blueguard.png",
+        "badge_es":       "SEGURIDAD",
+        "badge_en":       "SECURITY",
+        "badge":          "SEGURIDAD",
+        "is_disabled":    False,
+    },
     # ── Casillas de Escalabilidad Futura (Próximamente) ───────────────
     "streamer_hub": {
         "name_es":        "StreamerHub",
