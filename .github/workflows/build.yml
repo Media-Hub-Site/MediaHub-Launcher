@@ -55,10 +55,24 @@ jobs:
       - name: Build Executable with PyInstaller
         run: pyinstaller main.spec
 
+      - name: Sign Executable Binary (Code Signing)
+        shell: pwsh
+        run: |
+          if (Test-Path "dist\Media Hub\Media Hub.exe") {
+            .\scripts\sign_binary.ps1 -FilePath "dist\Media Hub\Media Hub.exe"
+          }
+
       - name: Build Installer with Inno Setup
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
         with:
           path: Media-Hub.iss
+
+      - name: Sign Inno Setup Installer
+        shell: pwsh
+        run: |
+          if (Test-Path "Output\MediaHubInstaller.exe") {
+            .\scripts\sign_binary.ps1 -FilePath "Output\MediaHubInstaller.exe"
+          }
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
