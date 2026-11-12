@@ -42,9 +42,12 @@ Thumbs.db
 destino/
 tmp_test/
 
-# Logs/temp files
-*.log
-*.tmp
+# Certificates and secrets
+*.pfx
+*.p12
+*.cer
+*.crt
+*cert_base64.txt
 
 # *.iss
 *.spec
