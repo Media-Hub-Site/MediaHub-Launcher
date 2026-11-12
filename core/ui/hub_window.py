@@ -349,13 +349,30 @@ class InstallWorker(QThread):
         if token:
             headers["Authorization"] = f"Bearer {token}"
 
+        release = None
         try:
             r = requests.get(api_url, headers=headers, timeout=10)
             r.raise_for_status()
             release = r.json()
         except Exception as e:
-            self.error.emit(f"No se pudo consultar el repositorio:\n{e}")
-            return
+            # Fallback directo sin API de GitHub cuando se supera el rate limit de 60 req/h (HTTP 403)
+            repo_dir = reg.get("dir", "")
+            if repo_dir:
+                fallback_asset = f"{repo_dir}.zip"
+                fallback_url = f"https://github.com/{repo}/releases/latest/download/{fallback_asset}"
+                release = {
+                    "tag_name": "1.0.0",
+                    "assets": [
+                        {
+                            "name": fallback_asset,
+                            "browser_download_url": fallback_url,
+                            "size": 0,
+                        }
+                    ],
+                }
+            else:
+                self.error.emit(f"No se pudo consultar el repositorio:\n{e}")
+                return
 
         latest_tag = release.get("tag_name", "latest")
         assets = release.get("assets", [])
@@ -789,7 +806,8 @@ class HubWindow(QMainWindow):
             (0, 1), (0, 2),
             (1, 1), (1, 2),
             (2, 0), (2, 1), (2, 2),
-            (3, 0), (3, 1), (3, 2)
+            (3, 0), (3, 1), (3, 2),
+            (4, 0), (4, 1), (4, 2)
         ]
         slot_idx = 0
 
