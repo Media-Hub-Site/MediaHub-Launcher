@@ -72,6 +72,11 @@ STRINGS = {
         "btn_sound_on": "Sonido: Activado",
         "btn_sound_off": "Sonido: Silenciado",
         "btn_sound_tooltip": "Activar o silenciar los efectos de sonido de la interfaz",
+        "sidebar_header": "SECCIONES",
+        "games_empty_title": "🎮 Zona Arcade & Juegos Livianos",
+        "games_empty_desc": "Este espacio está reservado para la colección de juegos livianos de entretenimiento inmediato de Media Hub. ¡Próximamente disponibles para instalar!",
+        "installed_empty_title": "Aún no tienes aplicaciones instaladas",
+        "installed_empty_desc": "Explora las secciones de Herramientas, Estudio o Administración y haz clic en 'Instalar' para descargar tu primera app.",
     },
     "en": {
         "app_title": "Media Hub",
@@ -127,6 +132,11 @@ STRINGS = {
         "btn_sound_on": "Sound: Enabled",
         "btn_sound_off": "Sound: Muted",
         "btn_sound_tooltip": "Toggle interface sound effects",
+        "sidebar_header": "SECTIONS",
+        "games_empty_title": "🎮 Arcade & Lightweight Games Zone",
+        "games_empty_desc": "This space is reserved for Media Hub's upcoming collection of lightweight instant-entertainment mini-games. Stay tuned!",
+        "installed_empty_title": "No applications installed yet",
+        "installed_empty_desc": "Explore the Tools, Studio or Management sections and click 'Install' to download your first app.",
     }
 }
 
