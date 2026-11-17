@@ -1,7 +1,7 @@
 """
 core/config.py
 ──────────────
-Configuración global del Launcher y registro de micro-aplicaciones.
+Configuración global del Launcher, categorías de secciones y registro de micro-aplicaciones.
 La versión del launcher se resuelve dinámicamente con get_launcher_version().
 """
 
@@ -13,7 +13,8 @@ GITHUB_REPO = "Media-Hub-Site/MediaHub-Launcher"
 ORG_NAME = "Media-Hub-Site"
 
 # Fallback si aún no existe archivo de versión local ni conexión
-DEFAULT_LAUNCHER_VERSION = "v1.0.0"
+DEFAULT_LAUNCHER_VERSION = "v1.4.0"
+
 
 def get_launcher_data_dir() -> str:
     home = os.environ.get("USERPROFILE") or os.path.expanduser("~")
@@ -21,8 +22,10 @@ def get_launcher_data_dir() -> str:
     os.makedirs(path, exist_ok=True)
     return path
 
+
 def get_launcher_version_file() -> str:
     return os.path.join(get_launcher_data_dir(), "launcher_version.json")
+
 
 def get_launcher_version() -> str:
     """
@@ -30,9 +33,8 @@ def get_launcher_version() -> str:
     Prioridad:
     1. Archivo local de instalación empaquetado (version.json junto al exe o root).
     2. Archivo persistido de usuario (~/.mediahub/launcher_version.json).
-    3. DEFAULT_LAUNCHER_VERSION (ej. v1.0.0).
+    3. DEFAULT_LAUNCHER_VERSION (ej. v1.4.0).
     """
-    # 1. Comprobar version.json empaquetado con el ejecutable/código
     if getattr(sys, 'frozen', False):
         base_dir = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
     else:
@@ -49,7 +51,6 @@ def get_launcher_version() -> str:
         except Exception:
             pass
 
-    # 2. Comprobar archivo de versión del perfil del usuario
     user_file = get_launcher_version_file()
     if os.path.isfile(user_file):
         try:
@@ -62,6 +63,7 @@ def get_launcher_version() -> str:
             pass
 
     return DEFAULT_LAUNCHER_VERSION
+
 
 def save_launcher_version(version: str):
     """Persiste la versión actual del launcher."""
@@ -77,7 +79,53 @@ def save_launcher_version(version: str):
 # Constante compatible hacia atrás
 APP_VERSION = get_launcher_version()
 
-# Registro de micro-apps con soporte bilingüe (Español / English)
+# Definición de Secciones / Categorías del Sidebar (Issue #53)
+SECTION_CATEGORIES = {
+    "all": {
+        "icon": "✦",
+        "name_es": "Explorar Todo",
+        "name_en": "Explore All",
+        "desc_es": "Todas las aplicaciones organizadas por secciones dentro del ecosistema Media Hub.",
+        "desc_en": "All applications organized by sections across the Media Hub ecosystem.",
+    },
+    "tools": {
+        "icon": "🛠️",
+        "name_es": "Herramientas",
+        "name_en": "Tools",
+        "desc_es": "Conversión multimedia, documentos, enlaces, imágenes, subtítulos IA y personalización tipográfica.",
+        "desc_en": "Multimedia conversion, documents, links, images, AI subtitles and custom typography.",
+    },
+    "studio": {
+        "icon": "🎙️",
+        "name_es": "Estudio & Creadores",
+        "name_en": "Creator Studio",
+        "desc_es": "Herramientas avanzadas de streaming, alertas con voces IA y laboratorio de síntesis sonora.",
+        "desc_en": "Advanced streaming tools, AI voice alerts and mathematical sound synthesis lab.",
+    },
+    "admin": {
+        "icon": "📊",
+        "name_es": "Administración",
+        "name_en": "Management",
+        "desc_es": "Finanzas personales, planimetría técnica para construcción y defensa de ciberseguridad.",
+        "desc_en": "Personal finance, technical architectural blueprints and Blue Team cybersecurity.",
+    },
+    "games": {
+        "icon": "🎮",
+        "name_es": "Juegos",
+        "name_en": "Games",
+        "desc_es": "Colección de mini-juegos livianos para entretenimiento inmediato.",
+        "desc_en": "Collection of lightweight mini-games for instant entertainment.",
+    },
+    "installed": {
+        "icon": "✓",
+        "name_es": "Instaladas",
+        "name_en": "Installed",
+        "desc_es": "Aplicaciones descargadas y listas para abrir en este equipo.",
+        "desc_en": "Applications currently installed and ready to launch on this PC.",
+    },
+}
+
+# Registro de micro-apps con soporte bilingüe (Español / English) y categoría de sección
 APP_REGISTRY = {
     "media": {
         "name_es":        "Convertidor Multimedia",
@@ -93,37 +141,8 @@ APP_REGISTRY = {
         "badge_es":       "9 EN 1",
         "badge_en":       "9 IN 1",
         "badge":          "9 EN 1",
+        "category":       "tools",
         "is_hero":        True,
-    },
-    "docs": {
-        "name_es":        "Convertidor de Documentos",
-        "name_en":        "Document Converter",
-        "name":           "Convertidor de Documentos",
-        "description_es": "Conversión inteligente entre PDF, Word, Excel, PowerPoint e imágenes a 300 DPI.",
-        "description_en": "Intelligent conversion between PDF, Word, Excel, PowerPoint and images at 300 DPI.",
-        "description":    "Conversión inteligente entre PDF, Word, Excel, PowerPoint e imágenes a 300 DPI.",
-        "repo":           f"{ORG_NAME}/MediaHub-DocumentConverter",
-        "exe":            "MediaHub-DocumentConverter.exe",
-        "dir":            "MediaHub-DocumentConverter",
-        "icon":           "docs.png",
-        "badge_es":       "OFICINA",
-        "badge_en":       "OFFICE",
-        "badge":          "OFICINA",
-    },
-    "link": {
-        "name_es":        "Convertidor de Links",
-        "name_en":        "Link Converter",
-        "name":           "Convertidor de Links",
-        "description_es": "Descarga por lotes desde YouTube, TikTok, Instagram y playlists con soporte paralelo.",
-        "description_en": "Batch downloader from YouTube, TikTok, Instagram and playlists with parallel support.",
-        "description":    "Descarga por lotes desde YouTube, TikTok, Instagram y playlists con soporte paralelo.",
-        "repo":           f"{ORG_NAME}/MediaHub-LinkConverter",
-        "exe":            "MediaHub-LinkConverter.exe",
-        "dir":            "MediaHub-LinkConverter",
-        "icon":           "link_converter.webp",
-        "badge_es":       "BATCH",
-        "badge_en":       "BATCH",
-        "badge":          "BATCH",
     },
     "image_tools": {
         "name_es":        "Herramientas de Imagen",
@@ -139,6 +158,7 @@ APP_REGISTRY = {
         "badge_es":       "CREATIVO",
         "badge_en":       "CREATIVE",
         "badge":          "CREATIVO",
+        "category":       "tools",
     },
     "subtitle": {
         "name_es":        "Generador de Subtítulos",
@@ -154,69 +174,55 @@ APP_REGISTRY = {
         "badge_es":       "IA LOCAL",
         "badge_en":       "LOCAL AI",
         "badge":          "IA LOCAL",
+        "category":       "tools",
     },
-    "budget_manager": {
-        "name_es":        "Gestor Presupuestario",
-        "name_en":        "Budget Manager",
-        "name":           "Gestor Presupuestario",
-        "description_es": "Gestión financiera, seguimiento de gastos, presupuestos y balance en tiempo real.",
-        "description_en": "Financial management, expense tracking, budgets and real-time cash balance.",
-        "description":    "Gestión financiera, seguimiento de gastos, presupuestos y balance en tiempo real.",
-        "repo":           f"{ORG_NAME}/MediaHub-GestorPresupuestario",
-        "exe":            "GestorPresupuestario.exe",
-        "dir":            "MediaHub-GestorPresupuestario",
-        "icon":           "presupuesto.png",
-        "badge_es":       "FINANZAS",
-        "badge_en":       "FINANCE",
-        "badge":          "FINANZAS",
-        "is_disabled":    False,
+    "docs": {
+        "name_es":        "Convertidor de Documentos",
+        "name_en":        "Document Converter",
+        "name":           "Convertidor de Documentos",
+        "description_es": "Conversión inteligente entre PDF, Word, Excel, PowerPoint e imágenes a 300 DPI.",
+        "description_en": "Intelligent conversion between PDF, Word, Excel, PowerPoint and images at 300 DPI.",
+        "description":    "Conversión inteligente entre PDF, Word, Excel, PowerPoint e imágenes a 300 DPI.",
+        "repo":           f"{ORG_NAME}/MediaHub-DocumentConverter",
+        "exe":            "MediaHub-DocumentConverter.exe",
+        "dir":            "MediaHub-DocumentConverter",
+        "icon":           "docs.png",
+        "badge_es":       "OFICINA",
+        "badge_en":       "OFFICE",
+        "badge":          "OFICINA",
+        "category":       "tools",
     },
-    "chile_planos": {
-        "name_es":        "ChilePlanos",
-        "name_en":        "ChilePlanos",
-        "name":           "ChilePlanos",
-        "description_es": "Hub de planimetría técnica y arquitectura para estudiantes y profesionales.",
-        "description_en": "Technical planimetry and architectural hub for students and professionals.",
-        "description":    "Hub de planimetría técnica y arquitectura para estudiantes y profesionales.",
-        "repo":           f"{ORG_NAME}/MediaHub-ChilePlanos",
-        "exe":            "ChilePlanos.exe",
-        "dir":            "MediaHub-ChilePlanos",
-        "icon":           "chileplanos.png",
-        "badge_es":       "PLANOS",
-        "badge_en":       "BLUEPRINTS",
-        "badge":          "PLANOS",
-        "is_disabled":    False,
+    "link": {
+        "name_es":        "Convertidor de Links",
+        "name_en":        "Link Converter",
+        "name":           "Convertidor de Links",
+        "description_es": "Descarga por lotes desde YouTube, TikTok, Instagram y playlists con soporte paralelo.",
+        "description_en": "Batch downloader from YouTube, TikTok, Instagram and playlists with parallel support.",
+        "description":    "Descarga por lotes desde YouTube, TikTok, Instagram y playlists con soporte paralelo.",
+        "repo":           f"{ORG_NAME}/MediaHub-LinkConverter",
+        "exe":            "MediaHub-LinkConverter.exe",
+        "dir":            "MediaHub-LinkConverter",
+        "icon":           "link_converter.webp",
+        "badge_es":       "BATCH",
+        "badge_en":       "BATCH",
+        "badge":          "BATCH",
+        "category":       "tools",
     },
-    "audiolab": {
-        "name_es":        "AudioLab",
-        "name_en":        "AudioLab",
-        "name":           "AudioLab",
-        "description_es": "Laboratorio de síntesis matemática, fórmulas Bytebeat y efectos procedurales SFX.",
-        "description_en": "Mathematical sound synthesis studio, Bytebeat formulas and procedural SFX.",
-        "description":    "Laboratorio de síntesis matemática, fórmulas Bytebeat y efectos procedurales SFX.",
-        "repo":           f"{ORG_NAME}/MediaHub-AudioLab",
-        "exe":            "AudioLab.exe",
-        "dir":            "MediaHub-AudioLab",
-        "icon":           "audiolab.png",
-        "badge_es":       "SÍNTESIS",
-        "badge_en":       "SYNTH",
-        "badge":          "SÍNTESIS",
-        "is_disabled":    False,
-    },
-    "blueguard": {
-        "name_es":        "BlueGuard",
-        "name_en":        "BlueGuard",
-        "name":           "BlueGuard",
-        "description_es": "Asistente Blue Team de ciberseguridad, puertos, red y logs traducidos en tiempo real.",
-        "description_en": "Real-time Blue Team cybersecurity assistant for network, ports and system logs.",
-        "description":    "Asistente Blue Team de ciberseguridad, puertos, red y logs traducidos en tiempo real.",
-        "repo":           f"{ORG_NAME}/MediaHub-BlueGuard",
-        "exe":            "BlueGuard.exe",
-        "dir":            "MediaHub-BlueGuard",
-        "icon":           "blueguard.png",
-        "badge_es":       "SEGURIDAD",
-        "badge_en":       "SECURITY",
-        "badge":          "SEGURIDAD",
+    "font_family": {
+        "name_es":        "FontFamily Atelier",
+        "name_en":        "FontFamily Atelier",
+        "name":           "FontFamily Atelier",
+        "description_es": "Estudio editorial de fuentes Unicode, caracteres invisibles, símbolos raros, marcos y emojis.",
+        "description_en": "Editorial Unicode typography studio, invisible characters, rare symbols, frames and emojis.",
+        "description":    "Estudio editorial de fuentes Unicode, caracteres invisibles, símbolos raros, marcos y emojis.",
+        "repo":           f"{ORG_NAME}/MediaHub-FontFamily",
+        "exe":            "FontFamily.exe",
+        "dir":            "MediaHub-FontFamily",
+        "icon":           "fontfamily.png",
+        "badge_es":       "TIPOGRAFÍA",
+        "badge_en":       "TYPOGRAPHY",
+        "badge":          "TIPOGRAFÍA",
+        "category":       "tools",
         "is_disabled":    False,
     },
     "streamstudio": {
@@ -233,6 +239,75 @@ APP_REGISTRY = {
         "badge_es":       "STREAMING",
         "badge_en":       "STREAMING",
         "badge":          "STREAMING",
+        "category":       "studio",
+        "is_disabled":    False,
+    },
+    "audiolab": {
+        "name_es":        "AudioLab",
+        "name_en":        "AudioLab",
+        "name":           "AudioLab",
+        "description_es": "Laboratorio de síntesis matemática, fórmulas Bytebeat y efectos procedurales SFX.",
+        "description_en": "Mathematical sound synthesis studio, Bytebeat formulas and procedural SFX.",
+        "description":    "Laboratorio de síntesis matemática, fórmulas Bytebeat y efectos procedurales SFX.",
+        "repo":           f"{ORG_NAME}/MediaHub-AudioLab",
+        "exe":            "AudioLab.exe",
+        "dir":            "MediaHub-AudioLab",
+        "icon":           "audiolab.png",
+        "badge_es":       "SÍNTESIS",
+        "badge_en":       "SYNTH",
+        "badge":          "SÍNTESIS",
+        "category":       "studio",
+        "is_disabled":    False,
+    },
+    "budget_manager": {
+        "name_es":        "Gestor Presupuestario",
+        "name_en":        "Budget Manager",
+        "name":           "Gestor Presupuestario",
+        "description_es": "Gestión financiera, seguimiento de gastos, presupuestos y balance en tiempo real.",
+        "description_en": "Financial management, expense tracking, budgets and real-time cash balance.",
+        "description":    "Gestión financiera, seguimiento de gastos, presupuestos y balance en tiempo real.",
+        "repo":           f"{ORG_NAME}/MediaHub-GestorPresupuestario",
+        "exe":            "GestorPresupuestario.exe",
+        "dir":            "MediaHub-GestorPresupuestario",
+        "icon":           "presupuesto.png",
+        "badge_es":       "FINANZAS",
+        "badge_en":       "FINANCE",
+        "badge":          "FINANZAS",
+        "category":       "admin",
+        "is_disabled":    False,
+    },
+    "chile_planos": {
+        "name_es":        "ChilePlanos",
+        "name_en":        "ChilePlanos",
+        "name":           "ChilePlanos",
+        "description_es": "Hub de planimetría técnica y arquitectura para estudiantes y profesionales.",
+        "description_en": "Technical planimetry and architectural hub for students and professionals.",
+        "description":    "Hub de planimetría técnica y arquitectura para estudiantes y profesionales.",
+        "repo":           f"{ORG_NAME}/MediaHub-ChilePlanos",
+        "exe":            "ChilePlanos.exe",
+        "dir":            "MediaHub-ChilePlanos",
+        "icon":           "chileplanos.png",
+        "badge_es":       "PLANOS",
+        "badge_en":       "BLUEPRINTS",
+        "badge":          "PLANOS",
+        "category":       "admin",
+        "is_disabled":    False,
+    },
+    "blueguard": {
+        "name_es":        "BlueGuard",
+        "name_en":        "BlueGuard",
+        "name":           "BlueGuard",
+        "description_es": "Asistente Blue Team de ciberseguridad, puertos, red y logs traducidos en tiempo real.",
+        "description_en": "Real-time Blue Team cybersecurity assistant for network, ports and system logs.",
+        "description":    "Asistente Blue Team de ciberseguridad, puertos, red y logs traducidos en tiempo real.",
+        "repo":           f"{ORG_NAME}/MediaHub-BlueGuard",
+        "exe":            "BlueGuard.exe",
+        "dir":            "MediaHub-BlueGuard",
+        "icon":           "blueguard.png",
+        "badge_es":       "SEGURIDAD",
+        "badge_en":       "SECURITY",
+        "badge":          "SEGURIDAD",
+        "category":       "admin",
         "is_disabled":    False,
     },
 }
@@ -248,3 +323,14 @@ def get_app_metadata(app_id: str, lang: str = "es") -> dict:
     meta["description"] = reg.get(f"description_{lang}", reg.get("description", ""))
     meta["badge"] = reg.get(f"badge_{lang}", reg.get("badge", ""))
     return meta
+
+
+def get_section_metadata(section_id: str, lang: str = "es") -> dict:
+    """Devuelve los metadatos de una sección/categoría traducidos al idioma solicitado."""
+    sec = SECTION_CATEGORIES.get(section_id, {})
+    return {
+        "id": section_id,
+        "icon": sec.get("icon", "•"),
+        "name": sec.get(f"name_{lang}", sec.get("name_es", section_id)),
+        "description": sec.get(f"desc_{lang}", sec.get("desc_es", "")),
+    }
