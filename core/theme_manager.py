@@ -553,6 +553,80 @@ def _build_hub_styles(h: dict) -> dict:
         }}
     """
 
+    sidebar = f"""
+        QFrame#hubSidebar {{
+            background-color: {h['card_bg']};
+            border: 1px solid {h['card_border']};
+            border-radius: 16px;
+        }}
+    """
+
+    sidebar_label = f"""
+        QLabel {{
+            color: {h['header_sub']};
+            font-size: 8.5pt;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            padding: 2px 8px;
+        }}
+    """
+
+    sidebar_btn = f"""
+        QPushButton {{
+            background-color: transparent;
+            color: {h['card_subtitle']};
+            border: 1px solid transparent;
+            border-radius: 10px;
+            padding: 9px 12px;
+            text-align: left;
+            font-size: 9.5pt;
+            font-weight: 600;
+        }}
+        QPushButton:hover {{
+            background-color: {h['toggle_bg_hover']};
+            color: {h['card_title']};
+        }}
+    """
+
+    sidebar_btn_active = f"""
+        QPushButton {{
+            background-color: {h['tag_bg']};
+            color: {h['card_title']};
+            border: 1px solid {h['card_border_hover']};
+            border-radius: 10px;
+            padding: 9px 12px;
+            text-align: left;
+            font-size: 9.5pt;
+            font-weight: 800;
+        }}
+    """
+
+    section_header_title = f"""
+        QLabel {{
+            color: {h['card_title']};
+            font-size: 13.5pt;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+        }}
+    """
+
+    section_header_desc = f"""
+        QLabel {{
+            color: {h['header_sub']};
+            font-size: 9pt;
+            font-weight: 500;
+        }}
+    """
+
+    section_divider = f"""
+        QFrame {{
+            background-color: {h['card_border']};
+            max-height: 1px;
+            min-height: 1px;
+            border: none;
+        }}
+    """
+
     return {
         "window":           window,
         "title":            title,
@@ -577,6 +651,13 @@ def _build_hub_styles(h: dict) -> dict:
         "dock":             dock,
         "scroll_area":      scroll_area,
         "search_input":     search_input,
+        "sidebar":          sidebar,
+        "sidebar_label":    sidebar_label,
+        "sidebar_btn":      sidebar_btn,
+        "sidebar_btn_active": sidebar_btn_active,
+        "section_header_title": section_header_title,
+        "section_header_desc":  section_header_desc,
+        "section_divider":      section_divider,
     }
 
 

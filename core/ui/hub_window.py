@@ -21,7 +21,11 @@ from PyQt6.QtCore import QMimeData, Qt, QSize, QThread, pyqtSignal
 
 from core.theme_manager import ThemeManager
 from core.updater import CheckUpdateThread, UpdateDialog
-from core.config import APP_REGISTRY, get_launcher_version, save_launcher_version, get_app_metadata
+from core.config import (
+    APP_REGISTRY, SECTION_CATEGORIES,
+    get_launcher_version, save_launcher_version,
+    get_app_metadata, get_section_metadata
+)
 from core.i18n import t, get_current_language, save_current_language, save_app_language, get_app_language
 from core.sound_manager import SoundManager
 
@@ -682,10 +686,11 @@ class HubWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Media Hub")
-        self.setMinimumSize(940, 620)
-        self.resize(980, 680)
+        self.setMinimumSize(980, 640)
+        self.resize(1140, 720)
         self._tm = ThemeManager.instance()
         self._workers: dict[str, InstallWorker] = {}
+        self._current_section: str = "all"
         self.init_ui()
         self._apply_theme()
 
@@ -780,7 +785,46 @@ class HubWindow(QMainWindow):
 
         main_layout.addLayout(header_layout)
 
-        # Bento Grid Dinámico y Escalable con Scroll
+        # ── Contenedor Principal: Sidebar de Secciones + Área de Contenido Bento ──
+        body_layout = QHBoxLayout()
+        body_layout.setSpacing(20)
+
+        # 1. Sidebar Lateral de Secciones (Issue #53)
+        self.sidebar_frame = QFrame()
+        self.sidebar_frame.setObjectName("hubSidebar")
+        self.sidebar_frame.setFixedWidth(220)
+        sidebar_layout = QVBoxLayout(self.sidebar_frame)
+        sidebar_layout.setContentsMargins(12, 16, 12, 16)
+        sidebar_layout.setSpacing(6)
+
+        self.sidebar_title_lbl = QLabel(t("sidebar_header"))
+        sidebar_layout.addWidget(self.sidebar_title_lbl)
+
+        self._sidebar_btns: dict[str, QPushButton] = {}
+        sidebar_order = ["all", "tools", "studio", "admin", "games"]
+        for sec_id in sidebar_order:
+            btn = QPushButton()
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda checked, sid=sec_id: self._select_section(sid))
+            sidebar_layout.addWidget(btn)
+            self._sidebar_btns[sec_id] = btn
+
+        self.sidebar_sep = QFrame()
+        self.sidebar_sep.setFixedHeight(1)
+        sidebar_layout.addSpacing(4)
+        sidebar_layout.addWidget(self.sidebar_sep)
+        sidebar_layout.addSpacing(4)
+
+        btn_inst = QPushButton()
+        btn_inst.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_inst.clicked.connect(lambda checked: self._select_section("installed"))
+        sidebar_layout.addWidget(btn_inst)
+        self._sidebar_btns["installed"] = btn_inst
+
+        sidebar_layout.addStretch()
+        body_layout.addWidget(self.sidebar_frame)
+
+        # 2. Área Desplazable con Secciones y Tarjetas Bento
         self.scroll_area = QScrollArea()
         self.scroll_area.setObjectName("hubScrollArea")
         self.scroll_area.setWidgetResizable(True)
@@ -793,55 +837,136 @@ class HubWindow(QMainWindow):
         self.scroll_content.setObjectName("hubScrollContent")
         self.scroll_content.setStyleSheet("background: transparent;")
 
-        self.grid_layout = QGridLayout(self.scroll_content)
-        self.grid_layout.setSpacing(16)
-        self.grid_layout.setContentsMargins(0, 2, 8, 2)
-        self.grid_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self._card_dict = {}
+        self.sections_layout = QVBoxLayout(self.scroll_content)
+        self.sections_layout.setSpacing(24)
+        self.sections_layout.setContentsMargins(0, 2, 8, 12)
+        self.sections_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        # Generar tarjetas dinámicamente desde APP_REGISTRY
-        # Slot 0 (Hero): 0, 0 span (2, 1)
-        # Slots siguientes distribuidos en cuadrícula
-        slot_positions = [
-            (0, 1), (0, 2),
-            (1, 1), (1, 2),
-            (2, 0), (2, 1), (2, 2),
-            (3, 0), (3, 1), (3, 2),
-            (4, 0), (4, 1), (4, 2)
-        ]
-        slot_idx = 0
+        self._card_dict: dict[str, AppCard] = {}
+        self._section_blocks: dict[str, dict] = {}
 
         curr_lang = get_current_language()
-        for app_id, raw_meta in APP_REGISTRY.items():
-            meta = get_app_metadata(app_id, curr_lang)
-            is_hero = raw_meta.get("is_hero", False)
-            is_disabled = raw_meta.get("is_disabled", False)
-            card = AppCard(
-                card_id=app_id,
-                title=meta.get("name", app_id),
-                subtitle=meta.get("description", ""),
-                icon_file=raw_meta.get("icon", "media.png"),
-                badge_text=meta.get("badge", ""),
-                is_hero=is_hero,
-                is_disabled=is_disabled
-            )
-            card.action_btn.clicked.connect(lambda checked, aid=app_id: self._handle_card(aid))
-            self._card_dict[app_id] = card
+        content_sections = ["tools", "studio", "admin", "games"]
 
-            if is_hero:
-                self.grid_layout.addWidget(card, 0, 0, 2, 1)
-            else:
-                if slot_idx < len(slot_positions):
-                    r, c = slot_positions[slot_idx]
-                    self.grid_layout.addWidget(card, r, c)
-                    slot_idx += 1
+        for sec_id in content_sections:
+            sec_meta = get_section_metadata(sec_id, curr_lang)
+            sec_widget = QWidget()
+            sec_vbox = QVBoxLayout(sec_widget)
+            sec_vbox.setContentsMargins(0, 0, 0, 0)
+            sec_vbox.setSpacing(10)
 
-        self.grid_layout.setColumnStretch(0, 11)
-        self.grid_layout.setColumnStretch(1, 10)
-        self.grid_layout.setColumnStretch(2, 10)
+            # Cabecera de la sección con línea divisora (Herramientas ──────)
+            hdr_top = QHBoxLayout()
+            hdr_top.setSpacing(10)
+            lbl_sec_title = QLabel(f"{sec_meta['icon']}  {sec_meta['name']}")
+            lbl_sec_badge = QLabel("0")
+            div_line = QFrame()
+            div_line.setFixedHeight(1)
 
+            hdr_top.addWidget(lbl_sec_title)
+            hdr_top.addWidget(lbl_sec_badge)
+            hdr_top.addWidget(div_line, 1)
+            sec_vbox.addLayout(hdr_top)
+
+            lbl_sec_desc = QLabel(sec_meta["description"])
+            lbl_sec_desc.setWordWrap(True)
+            sec_vbox.addWidget(lbl_sec_desc)
+
+            sec_grid = QGridLayout()
+            sec_grid.setSpacing(16)
+            sec_grid.setContentsMargins(0, 4, 0, 0)
+            sec_grid.setColumnStretch(0, 11)
+            sec_grid.setColumnStretch(1, 10)
+            sec_grid.setColumnStretch(2, 10)
+
+            sec_apps = [
+                (aid, rmeta) for aid, rmeta in APP_REGISTRY.items()
+                if rmeta.get("category", "tools") == sec_id
+            ]
+
+            has_hero_in_sec = any(rm.get("is_hero", False) for _, rm in sec_apps)
+            hero_slots = [
+                (0, 1), (0, 2),
+                (1, 1), (1, 2),
+                (2, 0), (2, 1), (2, 2),
+                (3, 0), (3, 1), (3, 2),
+            ]
+            normal_slots = [
+                (r, c) for r in range(6) for c in range(3)
+            ]
+            slot_idx = 0
+
+            for app_id, raw_meta in sec_apps:
+                meta = get_app_metadata(app_id, curr_lang)
+                is_hero = raw_meta.get("is_hero", False)
+                is_disabled = raw_meta.get("is_disabled", False)
+                card = AppCard(
+                    card_id=app_id,
+                    title=meta.get("name", app_id),
+                    subtitle=meta.get("description", ""),
+                    icon_file=raw_meta.get("icon", "media.png"),
+                    badge_text=meta.get("badge", ""),
+                    is_hero=is_hero,
+                    is_disabled=is_disabled,
+                )
+                card.action_btn.clicked.connect(lambda checked, aid=app_id: self._handle_card(aid))
+                self._card_dict[app_id] = card
+
+                if is_hero:
+                    sec_grid.addWidget(card, 0, 0, 2, 1)
+                else:
+                    slots = hero_slots if has_hero_in_sec else normal_slots
+                    if slot_idx < len(slots):
+                        r, c = slots[slot_idx]
+                        sec_grid.addWidget(card, r, c)
+                        slot_idx += 1
+
+            # Si es la sección de Juegos y aún no hay juegos registrados, mostrar tarjeta Arcade
+            empty_placeholder = None
+            if sec_id == "games" and not sec_apps:
+                empty_placeholder = QFrame()
+                empty_placeholder.setObjectName("appCardDisabled")
+                ep_lay = QVBoxLayout(empty_placeholder)
+                ep_lay.setContentsMargins(24, 20, 24, 20)
+                ep_lay.setSpacing(6)
+                self.lbl_games_empty_title = QLabel(t("games_empty_title"))
+                self.lbl_games_empty_desc = QLabel(t("games_empty_desc"))
+                self.lbl_games_empty_desc.setWordWrap(True)
+                ep_lay.addWidget(self.lbl_games_empty_title)
+                ep_lay.addWidget(self.lbl_games_empty_desc)
+                sec_grid.addWidget(empty_placeholder, 0, 0, 1, 3)
+
+            sec_vbox.addLayout(sec_grid)
+            self.sections_layout.addWidget(sec_widget)
+
+            self._section_blocks[sec_id] = {
+                "widget": sec_widget,
+                "lbl_title": lbl_sec_title,
+                "lbl_badge": lbl_sec_badge,
+                "div_line": div_line,
+                "lbl_desc": lbl_sec_desc,
+                "app_ids": [aid for aid, _ in sec_apps],
+                "empty_placeholder": empty_placeholder,
+            }
+
+        # Banner para cuando se filtra por "Instaladas" y aún no hay ninguna instalada
+        self.installed_empty_card = QFrame()
+        self.installed_empty_card.setObjectName("appCardDisabled")
+        ie_lay = QVBoxLayout(self.installed_empty_card)
+        ie_lay.setContentsMargins(24, 22, 24, 22)
+        ie_lay.setSpacing(6)
+        self.lbl_inst_empty_title = QLabel(t("installed_empty_title"))
+        self.lbl_inst_empty_desc = QLabel(t("installed_empty_desc"))
+        self.lbl_inst_empty_desc.setWordWrap(True)
+        ie_lay.addWidget(self.lbl_inst_empty_title)
+        ie_lay.addWidget(self.lbl_inst_empty_desc)
+        self.installed_empty_card.hide()
+        self.sections_layout.addWidget(self.installed_empty_card)
+
+        self.sections_layout.addStretch()
         self.scroll_area.setWidget(self.scroll_content)
-        main_layout.addWidget(self.scroll_area, 1)
+        body_layout.addWidget(self.scroll_area, 1)
+        main_layout.addLayout(body_layout, 1)
 
         # Footer Dock Bento
         self.footer_dock = QFrame()
@@ -869,15 +994,89 @@ class HubWindow(QMainWindow):
 
         main_layout.addWidget(self.footer_dock)
         self._update_dock_status()
+        self._refresh_sections_visibility()
+
+    def _select_section(self, section_id: str):
+        SoundManager.instance().play("click")
+        self._current_section = section_id
+        self._refresh_sections_visibility()
+        self._style_sidebar_buttons(self._tm.hub_styles())
 
     def _filter_cards(self, query: str):
-        query = query.strip().lower()
-        for app_id, card in self._card_dict.items():
-            reg = APP_REGISTRY.get(app_id, {})
-            name = reg.get("name", "").lower()
-            desc = reg.get("description", "").lower()
-            match = (not query) or (query in name) or (query in desc) or (query in app_id)
-            card.setVisible(match)
+        self._refresh_sections_visibility()
+
+    def _refresh_sections_visibility(self):
+        query = self.search_input.text().strip().lower()
+        curr_lang = get_current_language()
+        sec_filter = self._current_section
+
+        total_installed_visible = 0
+
+        for sec_id, block in self._section_blocks.items():
+            app_ids = block["app_ids"]
+            visible_in_sec = 0
+
+            for app_id in app_ids:
+                card = self._card_dict.get(app_id)
+                if not card:
+                    continue
+                meta = get_app_metadata(app_id, curr_lang)
+                name = meta.get("name", "").lower()
+                desc = meta.get("description", "").lower()
+                badge = meta.get("badge", "").lower()
+
+                match_query = (not query) or (query in name) or (query in desc) or (query in badge) or (query in app_id)
+                if query or sec_filter == "all":
+                    match_sec = True
+                elif sec_filter == "installed":
+                    match_sec = get_app_exe(app_id) is not None
+                else:
+                    match_sec = (sec_id == sec_filter)
+
+                is_vis = match_query and match_sec
+                card.setVisible(is_vis)
+                if is_vis:
+                    visible_in_sec += 1
+                    if sec_filter == "installed":
+                        total_installed_visible += 1
+
+            block["lbl_badge"].setText(str(len(app_ids)))
+
+            if sec_id == "games" and not app_ids:
+                # La sección de juegos muestra su banner informativo en 'all' o 'games' si no hay búsqueda activa
+                show_games_sec = (sec_filter in ("all", "games")) and (not query or "juego" in query or "game" in query)
+                block["widget"].setVisible(show_games_sec)
+            else:
+                block["widget"].setVisible(visible_in_sec > 0)
+
+        self.installed_empty_card.setVisible(sec_filter == "installed" and total_installed_visible == 0)
+        self._update_sidebar_texts()
+
+    def _update_sidebar_texts(self):
+        curr_lang = get_current_language()
+        self.sidebar_title_lbl.setText(t("sidebar_header"))
+
+        counts = {
+            "all": len(APP_REGISTRY),
+            "tools": sum(1 for v in APP_REGISTRY.values() if v.get("category") == "tools"),
+            "studio": sum(1 for v in APP_REGISTRY.values() if v.get("category") == "studio"),
+            "admin": sum(1 for v in APP_REGISTRY.values() if v.get("category") == "admin"),
+            "games": sum(1 for v in APP_REGISTRY.values() if v.get("category") == "games"),
+            "installed": sum(1 for aid in APP_REGISTRY if get_app_exe(aid) is not None),
+        }
+
+        for sec_id, btn in self._sidebar_btns.items():
+            meta = get_section_metadata(sec_id, curr_lang)
+            c = counts.get(sec_id, 0)
+            count_str = f"  ({c})" if c > 0 or sec_id == "installed" else ""
+            btn.setText(f"{meta['icon']}   {meta['name']}{count_str}")
+
+    def _style_sidebar_buttons(self, styles: dict):
+        for sec_id, btn in self._sidebar_btns.items():
+            if sec_id == self._current_section:
+                btn.setStyleSheet(styles["sidebar_btn_active"])
+            else:
+                btn.setStyleSheet(styles["sidebar_btn"])
 
     def _open_feedback_form(self):
         try:
@@ -992,7 +1191,8 @@ class HubWindow(QMainWindow):
             styles = self._tm.hub_styles()
             card.apply_styles(styles)
         self._update_dock_status()
-        
+        self._refresh_sections_visibility()
+
         # Preguntar al usuario si desea crear un acceso directo en el escritorio (Issue #3)
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle(t("dialog_install_done_title"))
@@ -1126,6 +1326,7 @@ class HubWindow(QMainWindow):
                 card.refresh_state()
                 card.apply_styles(self._tm.hub_styles())
             self._update_dock_status()
+            self._refresh_sections_visibility()
             QMessageBox.information(
                 self,
                 t("dialog_uninstall_done_title"),
@@ -1189,7 +1390,38 @@ class HubWindow(QMainWindow):
         self.feedback_btn.setToolTip(t("dock_feedback_tooltip"))
         self.dock_folder_btn.setText(t("dock_folder"))
 
+        # Aplicar estilos al Sidebar y Cabeceras de Sección (Issue #53)
+        self.sidebar_frame.setStyleSheet(styles["sidebar"])
+        self.sidebar_title_lbl.setStyleSheet(styles["sidebar_label"])
+        self.sidebar_sep.setStyleSheet(styles["section_divider"])
+        self._update_sidebar_texts()
+        self._style_sidebar_buttons(styles)
+
+        for sec_id, block in self._section_blocks.items():
+            sec_meta = get_section_metadata(sec_id, curr_lang)
+            block["lbl_title"].setText(f"{sec_meta['icon']}  {sec_meta['name']}")
+            block["lbl_title"].setStyleSheet(styles["section_header_title"])
+            block["lbl_badge"].setStyleSheet(styles["tag_badge"])
+            block["div_line"].setStyleSheet(styles["section_divider"])
+            block["lbl_desc"].setText(sec_meta["description"])
+            block["lbl_desc"].setStyleSheet(styles["section_header_desc"])
+            if block.get("empty_placeholder") is not None:
+                block["empty_placeholder"].setStyleSheet(styles["card_disabled"])
+
+        if hasattr(self, "lbl_games_empty_title"):
+            self.lbl_games_empty_title.setText(t("games_empty_title"))
+            self.lbl_games_empty_title.setStyleSheet(styles["card_title"])
+            self.lbl_games_empty_desc.setText(t("games_empty_desc"))
+            self.lbl_games_empty_desc.setStyleSheet(styles["card_subtitle"])
+
+        self.installed_empty_card.setStyleSheet(styles["card_disabled"])
+        self.lbl_inst_empty_title.setText(t("installed_empty_title"))
+        self.lbl_inst_empty_title.setStyleSheet(styles["card_title"])
+        self.lbl_inst_empty_desc.setText(t("installed_empty_desc"))
+        self.lbl_inst_empty_desc.setStyleSheet(styles["card_subtitle"])
+
         self._update_dock_status()
+        self._refresh_sections_visibility()
 
         for card in self._card_dict.values():
             card.update_texts()
