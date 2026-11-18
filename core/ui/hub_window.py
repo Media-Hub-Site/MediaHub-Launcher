@@ -306,16 +306,32 @@ class FetchAppSizesThread(QThread):
                 resp = requests.get(url, timeout=6)
                 if resp.status_code == 200:
                     data = resp.json()
+                    total_sz_bytes = 0
                     for asset in data.get("assets", []):
                         if asset.get("name", "").endswith((".zip", ".exe")):
-                            sz_bytes = asset.get("size", 0)
-                            if sz_bytes > 0:
-                                mb = sz_bytes / (1024 * 1024)
-                                sz_str = f"{mb:.1f} MB" if mb < 1024 else f"{mb/1024:.2f} GB"
-                                if sizes.get(app_id) != sz_str:
-                                    sizes[app_id] = sz_str
-                                    changed = True
+                            total_sz_bytes += asset.get("size", 0)
                             break
+                    
+                    # Sumar assets adicionales (ej. images.zip en tag Assets de PokeBinder)
+                    for extra in reg.get("extra_assets", []):
+                        tag = extra.get("tag", "Assets")
+                        extra_url = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
+                        try:
+                            e_resp = requests.get(extra_url, timeout=5)
+                            if e_resp.status_code == 200:
+                                for e_asset in e_resp.json().get("assets", []):
+                                    if e_asset.get("name") == extra.get("name"):
+                                        total_sz_bytes += e_asset.get("size", 0)
+                                        break
+                        except Exception:
+                            pass
+
+                    if total_sz_bytes > 0:
+                        mb = total_sz_bytes / (1024 * 1024)
+                        sz_str = f"{mb:.1f} MB" if mb < 1024 else f"{mb/1024:.2f} GB"
+                        if sizes.get(app_id) != sz_str:
+                            sizes[app_id] = sz_str
+                            changed = True
             except Exception:
                 pass
         if changed:
@@ -396,6 +412,11 @@ class InstallWorker(QThread):
         self.progress.emit(10, f"Descargando {asset_name}…")
         tmp_file = os.path.join(tempfile.gettempdir(), asset_name)
 
+        # Si la app define assets adicionales (ej. PokeBinder images.zip), distribuimos el porcentaje
+        extra_assets = reg.get("extra_assets", [])
+        has_extras = len(extra_assets) > 0
+        main_dl_pct_max = 50 if has_extras else 75
+
         try:
             with requests.get(download_url, stream=True, timeout=30) as dl:
                 dl.raise_for_status()
@@ -405,13 +426,13 @@ class InstallWorker(QThread):
                         f.write(chunk)
                         downloaded += len(chunk)
                         if total > 0:
-                            pct = 10 + int(downloaded / total * 70)
+                            pct = 10 + int(downloaded / total * (main_dl_pct_max - 10))
                             self.progress.emit(pct, f"Descargando… {downloaded // (1024*1024)} MB")
         except Exception as e:
             self.error.emit(f"Error al descargar:\n{e}")
             return
 
-        self.progress.emit(85, "Instalando archivos…")
+        self.progress.emit(main_dl_pct_max, "Instalando archivos…")
         install_base = get_apps_install_dir()
         dest_dir = os.path.join(install_base, reg["dir"])
 
@@ -430,6 +451,52 @@ class InstallWorker(QThread):
         except Exception as e:
             self.error.emit(f"Error al instalar:\n{e}")
             return
+
+        # ── Descarga de Assets Adicionales (ej. images.zip en PokeBinder) ───────
+        if has_extras:
+            for extra in extra_assets:
+                asset_name_extra = extra.get("name", "images.zip")
+                tag_extra = extra.get("tag", "Assets")
+                sub_target = extra.get("target_subdir", "assets")
+                extract_extra = extra.get("extract", True)
+                desc_label = extra.get(f"description_{self.target_lang}", asset_name_extra)
+
+                self.progress.emit(55, f"Descargando {desc_label}…")
+                extra_tmp = os.path.join(tempfile.gettempdir(), f"{self.app_id}_{asset_name_extra}")
+                
+                # Obtener URL directa desde release tag
+                extra_dl_url = f"https://github.com/{repo}/releases/download/{tag_extra}/{asset_name_extra}"
+                try:
+                    with requests.get(extra_dl_url, stream=True, timeout=60, headers=headers) as dl_e:
+                        dl_e.raise_for_status()
+                        total_e = int(dl_e.headers.get("content-length", 0))
+                        dl_bytes = 0
+                        with open(extra_tmp, "wb") as f_e:
+                            for chunk in dl_e.iter_content(chunk_size=131072):
+                                f_e.write(chunk)
+                                dl_bytes += len(chunk)
+                                if total_e > 0:
+                                    pct_e = 55 + int(dl_bytes / total_e * 35)
+                                    mb_done = dl_bytes // (1024 * 1024)
+                                    mb_tot = total_e // (1024 * 1024)
+                                    self.progress.emit(pct_e, f"{desc_label}… {mb_done}/{mb_tot} MB")
+                except Exception as e:
+                    self.error.emit(f"Error descargando {desc_label}:\n{e}")
+                    return
+
+                self.progress.emit(92, f"Instalando {desc_label}…")
+                target_extract_dir = os.path.join(dest_dir, sub_target) if sub_target else dest_dir
+                os.makedirs(target_extract_dir, exist_ok=True)
+
+                try:
+                    if extract_extra and asset_name_extra.endswith(".zip"):
+                        with zipfile.ZipFile(extra_tmp, "r") as zf_e:
+                            zf_e.extractall(target_extract_dir)
+                    else:
+                        shutil.copy2(extra_tmp, target_extract_dir)
+                except Exception as e:
+                    self.error.emit(f"Error descomprimiendo {desc_label}:\n{e}")
+                    return
 
         self.progress.emit(100, t("status_ready"))
         curr_lang = get_current_language()
