@@ -478,9 +478,11 @@ class InstallWorker(QThread):
                 extra_asset_obj = next((a for a in assets if a.get("name") == asset_name_extra), None)
                 if extra_asset_obj:
                     extra_dl_url = extra_asset_obj.get("browser_download_url")
+                elif tag_extra:
+                    extra_dl_url = f"https://github.com/{repo}/releases/download/{tag_extra}/{asset_name_extra}"
                 else:
-                    target_tag = tag_extra if tag_extra else latest_tag
-                    extra_dl_url = f"https://github.com/{repo}/releases/download/{target_tag}/{asset_name_extra}"
+                    # Si no hay tag específico, usar el endpoint canónico de descarga de latest
+                    extra_dl_url = f"https://github.com/{repo}/releases/latest/download/{asset_name_extra}"
                 try:
                     with requests.get(extra_dl_url, stream=True, timeout=60, headers=headers) as dl_e:
                         dl_e.raise_for_status()
