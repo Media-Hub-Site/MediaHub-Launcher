@@ -329,7 +329,7 @@ APP_REGISTRY = {
         "extra_assets": [
             {
                 "name": "images.zip",
-                "tag": "Assets",
+                "tag": "",
                 "target_subdir": "assets",
                 "extract": True,
                 "description_es": "imágenes de cartas TCG",

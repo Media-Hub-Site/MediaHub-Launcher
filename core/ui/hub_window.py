@@ -312,19 +312,29 @@ class FetchAppSizesThread(QThread):
                             total_sz_bytes += asset.get("size", 0)
                             break
                     
-                    # Sumar assets adicionales (ej. images.zip en tag Assets de PokeBinder)
+                    # Sumar assets adicionales (ej. images.zip en PokeBinder)
                     for extra in reg.get("extra_assets", []):
-                        tag = extra.get("tag", "Assets")
-                        extra_url = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
-                        try:
-                            e_resp = requests.get(extra_url, timeout=5)
-                            if e_resp.status_code == 200:
-                                for e_asset in e_resp.json().get("assets", []):
-                                    if e_asset.get("name") == extra.get("name"):
-                                        total_sz_bytes += e_asset.get("size", 0)
-                                        break
-                        except Exception:
-                            pass
+                        extra_name = extra.get("name")
+                        # Primero revisar si ya vino en el release latest
+                        found_in_latest = False
+                        for asset in data.get("assets", []):
+                            if asset.get("name") == extra_name:
+                                total_sz_bytes += asset.get("size", 0)
+                                found_in_latest = True
+                                break
+                        if not found_in_latest:
+                            tag = extra.get("tag")
+                            if tag:
+                                extra_url = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
+                                try:
+                                    e_resp = requests.get(extra_url, timeout=5)
+                                    if e_resp.status_code == 200:
+                                        for e_asset in e_resp.json().get("assets", []):
+                                            if e_asset.get("name") == extra_name:
+                                                total_sz_bytes += e_asset.get("size", 0)
+                                                break
+                                except Exception:
+                                    pass
 
                     if total_sz_bytes > 0:
                         mb = total_sz_bytes / (1024 * 1024)
@@ -464,8 +474,13 @@ class InstallWorker(QThread):
                 self.progress.emit(55, f"Descargando {desc_label}…")
                 extra_tmp = os.path.join(tempfile.gettempdir(), f"{self.app_id}_{asset_name_extra}")
                 
-                # Obtener URL directa desde release tag
-                extra_dl_url = f"https://github.com/{repo}/releases/download/{tag_extra}/{asset_name_extra}"
+                # Obtener URL directa (intentar release actual/latest o tag específico)
+                extra_asset_obj = next((a for a in assets if a.get("name") == asset_name_extra), None)
+                if extra_asset_obj:
+                    extra_dl_url = extra_asset_obj.get("browser_download_url")
+                else:
+                    target_tag = tag_extra if tag_extra else latest_tag
+                    extra_dl_url = f"https://github.com/{repo}/releases/download/{target_tag}/{asset_name_extra}"
                 try:
                     with requests.get(extra_dl_url, stream=True, timeout=60, headers=headers) as dl_e:
                         dl_e.raise_for_status()
