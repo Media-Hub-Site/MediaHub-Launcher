@@ -326,6 +326,16 @@ APP_REGISTRY = {
         "badge":          "TCG BINDER",
         "category":       "admin",
         "is_disabled":    False,
+        "extra_assets": [
+            {
+                "name": "images.zip",
+                "tag": "Assets",
+                "target_subdir": "assets",
+                "extract": True,
+                "description_es": "imágenes de cartas TCG",
+                "description_en": "TCG card images",
+            }
+        ],
     },
 }
 
