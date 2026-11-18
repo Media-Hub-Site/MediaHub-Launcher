@@ -310,6 +310,23 @@ APP_REGISTRY = {
         "category":       "admin",
         "is_disabled":    False,
     },
+    "pokebinder": {
+        "name_es":        "PokeBinder",
+        "name_en":        "PokeBinder",
+        "name":           "PokeBinder",
+        "description_es": "Organizador visual de carpetas Pokémon TCG, cotización de cartas, mazos e inventario.",
+        "description_en": "Visual Pokémon TCG binder organizer, card pricing, decks and inventory tracker.",
+        "description":    "Organizador visual de carpetas Pokémon TCG, cotización de cartas, mazos e inventario.",
+        "repo":           f"{ORG_NAME}/PokeBinder",
+        "exe":            "PokeBinder.exe",
+        "dir":            "PokeBinder",
+        "icon":           "pokebinder.png",
+        "badge_es":       "TCG BINDER",
+        "badge_en":       "TCG BINDER",
+        "badge":          "TCG BINDER",
+        "category":       "admin",
+        "is_disabled":    False,
+    },
 }
 
 
