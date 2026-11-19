@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T04:16:10.783Z",
+  "updated_at": "2026-11-19T04:17:49.644Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -44,6 +44,13 @@
       "name_en": "Installed",
       "desc_es": "Aplicaciones descargadas y listas para abrir en este equipo.",
       "desc_en": "Applications currently installed and ready to launch on this PC."
+    },
+    "security": {
+      "icon": "📁",
+      "name_es": "Seguridad",
+      "name_en": "Security",
+      "desc_es": "Herramientas de seguridad, analisis y detección de virus, malware, etc",
+      "desc_en": "Security tools, analysis and detection of virus, malware, etc."
     }
   },
   "apps": {
