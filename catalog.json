@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T03:06:19.689Z",
+  "updated_at": "2026-11-19T03:06:44.448Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -74,7 +74,7 @@
       "icon": "quality.webp",
       "badge_es": "CREATIVO",
       "badge_en": "CREATIVE",
-      "category": "tools",
+      "category": "studio",
       "is_hero": false,
       "is_disabled": false,
       "visible": true
