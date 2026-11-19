@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T04:20:34.242Z",
+  "updated_at": "2026-11-19T04:20:54.849Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -194,7 +194,7 @@
       "badge_es": "CONSERVATORIO",
       "badge_en": "CONSERVATORY",
       "category": "studio",
-      "is_hero": false,
+      "is_hero": true,
       "is_disabled": false,
       "visible": true
     },
