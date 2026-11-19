@@ -13,7 +13,7 @@ GITHUB_REPO = "Media-Hub-Site/MediaHub-Launcher"
 ORG_NAME = "Media-Hub-Site"
 
 # Fallback si aún no existe archivo de versión local ni conexión
-DEFAULT_LAUNCHER_VERSION = "v1.4.0"
+DEFAULT_LAUNCHER_VERSION = "v1.5.0"
 
 
 def get_launcher_data_dir() -> str:
@@ -99,8 +99,8 @@ SECTION_CATEGORIES = {
         "icon": "🎙️",
         "name_es": "Estudio & Creadores",
         "name_en": "Creator Studio",
-        "desc_es": "Herramientas avanzadas de streaming, alertas con voces IA y laboratorio de síntesis sonora.",
-        "desc_en": "Advanced streaming tools, AI voice alerts and mathematical sound synthesis lab.",
+        "desc_es": "Herramientas avanzadas de streaming, alertas con voces IA, síntesis sonora y conservatorio musical interactivo.",
+        "desc_en": "Advanced streaming tools, AI voice alerts, mathematical sound synthesis and interactive music conservatory.",
     },
     "admin": {
         "icon": "📊",
@@ -256,6 +256,23 @@ APP_REGISTRY = {
         "badge_es":       "SÍNTESIS",
         "badge_en":       "SYNTH",
         "badge":          "SÍNTESIS",
+        "category":       "studio",
+        "is_disabled":    False,
+    },
+    "musical_trainer": {
+        "name_es":        "MusicalTrainer",
+        "name_en":        "MusicalTrainer",
+        "name":           "MusicalTrainer",
+        "description_es": "Conservatorio interactivo de lectura de partituras en 4 claves, armaduras, intervalos, acordes, diapasón y oído musical.",
+        "description_en": "Interactive music conservatory for sight-reading across 4 clefs, key signatures, intervals, chords, fretboard and ear training.",
+        "description":    "Conservatorio interactivo de lectura de partituras en 4 claves, armaduras, intervalos, acordes, diapasón y oído musical.",
+        "repo":           f"{ORG_NAME}/MusicalTrainer",
+        "exe":            "MusicalTrainer.exe",
+        "dir":            "MediaHub-MusicalTrainer",
+        "icon":           "musicaltrainer.png",
+        "badge_es":       "CONSERVATORIO",
+        "badge_en":       "CONSERVATORY",
+        "badge":          "CONSERVATORIO",
         "category":       "studio",
         "is_disabled":    False,
     },
