@@ -381,8 +381,10 @@ class FetchAppSizesThread(QThread):
                     resp = requests.get(url, headers=headers, timeout=6)
                     if resp.status_code == 200:
                         data = resp.json()
+                        extra_names = {extra.get("name") for extra in reg.get("extra_assets", []) if extra.get("name")}
                         for asset in data.get("assets", []):
-                            if asset.get("name", "").endswith((".zip", ".exe")):
+                            aname = asset.get("name", "")
+                            if aname not in extra_names and aname.endswith((".zip", ".exe")):
                                 total_sz_bytes += asset.get("size", 0)
                                 break
 
@@ -490,10 +492,18 @@ class InstallWorker(QThread):
 
         latest_tag = release.get("tag_name", "latest")
         assets = release.get("assets", [])
+        extra_assets = reg.get("extra_assets", [])
+        extra_names = {extra.get("name") for extra in extra_assets if extra.get("name")}
 
-        asset = next((a for a in assets if a["name"].endswith(".zip")), None)
+        # Priorizar assets principales de la aplicación (excluyendo zips adicionales como images.zip)
+        main_candidates = [a for a in assets if a.get("name") not in extra_names]
+        asset = next((a for a in main_candidates if a.get("name", "").endswith(".zip")), None)
         if not asset:
-            asset = next((a for a in assets if a["name"].endswith(".exe")), None)
+            asset = next((a for a in main_candidates if a.get("name", "").endswith(".exe")), None)
+        if not asset:
+            asset = next((a for a in assets if a.get("name", "").endswith(".zip")), None)
+        if not asset:
+            asset = next((a for a in assets if a.get("name", "").endswith(".exe")), None)
 
         if not asset:
             self.error.emit(f"No se encontró instalador en el release {latest_tag}.")
@@ -507,7 +517,6 @@ class InstallWorker(QThread):
         tmp_file = os.path.join(tempfile.gettempdir(), asset_name)
 
         # Si la app define assets adicionales (ej. PokeBinder images.zip), distribuimos el porcentaje
-        extra_assets = reg.get("extra_assets", [])
         has_extras = len(extra_assets) > 0
         main_dl_pct_max = 50 if has_extras else 75
 
