@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Media Hub • Administrador de Catálogo & Tarjetas</title>
+  <style>
+    :root {
+      --bg-base: #0c0e14;
+      --bg-surface: #131722;
+      --bg-card: #191e2d;
+      --bg-card-hover: #1f2638;
+      --bg-input: #0f131d;
+      --text-primary: #f3f5f9;
+      --text-secondary: #9ca6be;
+      --text-muted: #67728e;
+      --border: #262e42;
+      --border-strong: #374361;
+      --accent: #e07a38;
+      --accent-hover: #f08c4b;
+      --accent-soft: rgba(224, 122, 56, 0.14);
+      --green: #10b981;
+      --green-soft: rgba(16, 185, 129, 0.14);
+      --amber: #f59e0b;
+      --amber-soft: rgba(245, 158, 11, 0.15);
+      --red: #ef4444;
+      --red-soft: rgba(239, 68, 68, 0.15);
+      --blue: #3b82f6;
+      --blue-soft: rgba(59, 130, 246, 0.15);
+      --radius-lg: 16px;
+      --radius-md: 11px;
+      --radius-sm: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      font-family: "Segoe UI Variable Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.5;
+      min-height: 100vh;
+      padding-bottom: 60px;
+    }
+
+    /* Top Navigation Bar */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: rgba(19, 23, 34, 0.92);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 11px;
+      background: linear-gradient(135deg, #e07a38, #b45309);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.2rem;
+      box-shadow: 0 4px 14px rgba(224, 122, 56, 0.3);
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+
+    .brand-sub {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 0.86rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border-strong);
+      background: var(--bg-card);
+      color: var(--text-primary);
+      transition: all 0.16s ease;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    .btn-success {
+      background: var(--green);
+      border-color: var(--green);
+      color: #06140e;
+      font-weight: 800;
+    }
+
+    .btn-success:hover {
+      filter: brightness(1.08);
+    }
+
+    .btn-danger {
+      background: var(--red-soft);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+    }
+
+    .btn-danger:hover {
+      background: var(--red);
+      color: #ffffff;
+    }
+
+    .container {
+      max-width: 1340px;
+      margin: 24px auto;
+      padding: 0 24px;
+    }
+
+    /* KPI Metrics Bar */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .kpi-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 15px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .kpi-label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-secondary);
+      font-weight: 700;
+    }
+
+    .kpi-val {
+      font-size: 1.65rem;
+      font-weight: 800;
+    }
+
+    /* Scanner Banner */
+    .scanner-panel {
+      background: linear-gradient(135deg, rgba(25, 30, 45, 0.96), rgba(19, 23, 34, 0.96));
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      padding: 18px 22px;
+      margin-bottom: 22px;
+      display: none;
+    }
+
+    .scanner-panel.open {
+      display: block;
+    }
+
+    .scanner-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .repo-chip {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    /* Filter & Search Bar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      background: var(--bg-surface);
+      padding: 12px 16px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      padding: 7px 13px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-card);
+    }
+
+    .tab-btn.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-color: rgba(224, 122, 56, 0.4);
+      font-weight: 700;
+    }
+
+    .search-input {
+      background: var(--bg-input);
+      border: 1px solid var(--border-strong);
+      color: var(--text-primary);
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 0.88rem;
+      min-width: 250px;
+    }
+
+    /* Cards Grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 16px;
+    }
+
+    .app-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+      transition: all 0.16s ease;
+      position: relative;
+    }
+
+    .app-card:hover {
+      border-color: var(--border-strong);
+      transform: translateY(-2px);
+    }
+
+    .app-card.hidden-app {
+      opacity: 0.58;
+      border-style: dashed;
+    }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .app-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      object-fit: contain;
+      background: var(--bg-surface);
+      padding: 5px;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .card-titles {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .card-name-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+
+    .badge {
+      font-size: 0.68rem;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-accent {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(224, 122, 56, 0.35);
+    }
+
+    .badge-green {
+      background: var(--green-soft);
+      color: #34d399;
+    }
+
+    .badge-amber {
+      background: var(--amber-soft);
+      color: #fbbf24;
+    }
+
+    .badge-red {
+      background: var(--red-soft);
+      color: #f87171;
+    }
+
+    .badge-blue {
+      background: var(--blue-soft);
+      color: #60a5fa;
+    }
+
+    .card-repo {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-family: ui-monospace, Consolas, monospace;
+      margin-top: 2px;
+    }
+
+    .card-desc {
+      font-size: 0.87rem;
+      color: var(--text-secondary);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* Quick Toggles Row inside Card */
+    .toggles-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 22px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: #2c354d;
+      transition: 0.2s;
+      border-radius: 22px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.2s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--green);
+    }
+
+    input:checked + .slider.slider-amber {
+      background-color: var(--amber);
+    }
+
+    input:checked + .slider.slider-accent {
+      background-color: var(--accent);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(18px);
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding-top: 4px;
+    }
+
+    /* Modal Dialog */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 7, 12, 0.78);
+      backdrop-filter: blur(6px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      max-width: 680px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .form-group.full {
+      grid-column: 1 / -1;
+    }
+
+    .form-group label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .form-control {
+      background: var(--bg-input);
+      border: 1px solid var(--border-strong);
+      color: var(--text-primary);
+      padding: 9px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      font-family: inherit;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    textarea.form-control {
+      min-height: 70px;
+      resize: vertical;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 200;
+      background: #172336;
+      border: 1px solid var(--accent);
+      color: var(--text-primary);
+      padding: 13px 20px;
+      border-radius: var(--radius-md);
+      font-weight: 600;
+      font-size: 0.9rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      display: none;
+    }
+
+    .toast.show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo">✦</div>
+      <div>
+        <div class="brand-title">Media Hub • Catalog Studio</div>
+        <div class="brand-sub">Administrador en vivo de tarjetas, visibilidad y repositorios del Launcher</div>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <button class="btn" onclick="scanOrganizationRepos()">📡 Escanear Organización GitHub</button>
+      <button class="btn" onclick="openAppModal(null)">➕ Nueva App</button>
+      <button class="btn" onclick="openTokenModal()" id="btnTokenStatus">🔑 Token GitHub</button>
+      <button class="btn" onclick="downloadCatalogJson()">📥 Exportar JSON</button>
+      <button class="btn btn-success" onclick="publishToGitHub()" id="btnPublish">
+        💾 Publicar en Launcher <span id="unsavedBadge" style="display:none; background:#06140e; color:#34d399; padding:1px 7px; border-radius:99px; font-size:0.75rem;">0</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- KPIs -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <span class="kpi-label">Total Apps en Catálogo</span>
+        <span class="kpi-val" id="kpiTotal">0</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">🟢 Visibles y Activas</span>
+        <span class="kpi-val" id="kpiActive" style="color: var(--green);">0</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">🟡 Próximamente / Mantenimiento</span>
+        <span class="kpi-val" id="kpiDisabled" style="color: var(--amber);">0</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">🔴 Ocultas del Launcher</span>
+        <span class="kpi-val" id="kpiHidden" style="color: var(--red);">0</span>
+      </div>
+    </section>
+
+    <!-- Scanner Panel for Auto-Discovering New Organization Repositories -->
+    <section class="scanner-panel" id="scannerPanel">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <div>
+          <h3 style="font-size:1.05rem;">📡 Radar de Repositorios de <code>Media-Hub-Site</code></h3>
+          <p style="font-size:0.84rem; color:var(--text-secondary);" id="scannerSub">
+            Escaneando repositorios de la organización para detectar aplicaciones nuevas…
+          </p>
+        </div>
+        <button class="btn" onclick="document.getElementById('scannerPanel').classList.remove('open')">✕ Cerrar Radar</button>
+      </div>
+      <div class="scanner-list" id="scannerList"></div>
+    </section>
+
+    <!-- Filter Toolbar -->
+    <section class="toolbar">
+      <div class="tabs" id="sectionTabs">
+        <button class="tab-btn active" onclick="setFilterSection('all', this)">✦ Todas</button>
+        <button class="tab-btn" onclick="setFilterSection('tools', this)">🛠️ Herramientas</button>
+        <button class="tab-btn" onclick="setFilterSection('studio', this)">🎙️ Estudio & Creadores</button>
+        <button class="tab-btn" onclick="setFilterSection('admin', this)">📊 Administración</button>
+        <button class="tab-btn" onclick="setFilterSection('games', this)">🎮 Juegos</button>
+        <button class="tab-btn" onclick="setFilterSection('hidden', this)">🔴 Ocultas</button>
+      </div>
+      <input
+        type="text"
+        class="search-input"
+        id="searchInput"
+        placeholder="Buscar por nombre, ID, badge o repositorio…"
+        oninput="renderCards()"
+      />
+    </section>
+
+    <!-- Cards Grid -->
+    <section class="cards-grid" id="cardsGrid"></section>
+  </main>
+
+  <!-- Modal: Edit / Create App Card -->
+  <div class="modal-backdrop" id="appModalBackdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalTitle">✏️ Editar Tarjeta de Aplicación</h3>
+        <button class="btn" onclick="closeAppModal()">✕</button>
+      </div>
+      <form id="appForm" onsubmit="saveAppForm(event)">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>ID Interno (clave única)</label>
+            <input type="text" class="form-control" id="f_id" required placeholder="ej. musical_trainer" />
+          </div>
+          <div class="form-group">
+            <label>Categoría / Sección en Launcher</label>
+            <select class="form-control" id="f_category">
+              <option value="tools">🛠️ Herramientas (tools)</option>
+              <option value="studio">🎙️ Estudio & Creadores (studio)</option>
+              <option value="admin">📊 Administración (admin)</option>
+              <option value="games">🎮 Juegos (games)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Nombre (Español)</label>
+            <input type="text" class="form-control" id="f_name_es" required placeholder="ej. MusicalTrainer" />
+          </div>
+          <div class="form-group">
+            <label>Nombre (Inglés)</label>
+            <input type="text" class="form-control" id="f_name_en" required placeholder="ej. MusicalTrainer" />
+          </div>
+
+          <div class="form-group">
+            <label>Badge / Etiqueta (Español)</label>
+            <input type="text" class="form-control" id="f_badge_es" placeholder="ej. CONSERVATORIO" />
+          </div>
+          <div class="form-group">
+            <label>Badge / Etiqueta (Inglés)</label>
+            <input type="text" class="form-control" id="f_badge_en" placeholder="ej. CONSERVATORY" />
+          </div>
+
+          <div class="form-group full">
+            <label>Descripción (Español)</label>
+            <textarea class="form-control" id="f_desc_es" required></textarea>
+          </div>
+          <div class="form-group full">
+            <label>Descripción (Inglés)</label>
+            <textarea class="form-control" id="f_desc_en" required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Repositorio GitHub (Org/Repo)</label>
+            <input type="text" class="form-control" id="f_repo" required placeholder="Media-Hub-Site/MusicalTrainer" />
+          </div>
+          <div class="form-group">
+            <label>Nombre del Ejecutable (.exe)</label>
+            <input type="text" class="form-control" id="f_exe" required placeholder="MusicalTrainer.exe" />
+          </div>
+
+          <div class="form-group">
+            <label>Carpeta de Instalación Local</label>
+            <input type="text" class="form-control" id="f_dir" required placeholder="MediaHub-MusicalTrainer" />
+          </div>
+          <div class="form-group">
+            <label>Archivo de Icono (en assets/hub/)</label>
+            <input type="text" class="form-control" id="f_icon" required placeholder="musicaltrainer.png" />
+          </div>
+
+          <div class="form-group full">
+            <label>URL de Icono Remoto (Opcional — para apps nuevas sin actualizar el Launcher)</label>
+            <input type="text" class="form-control" id="f_icon_url" placeholder="https://raw.githubusercontent.com/Media-Hub-Site/MiApp/main/assets/hub/miapp.png" />
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding-top:14px; border-top:1px solid var(--border);">
+          <button type="button" class="btn btn-danger" id="btnDeleteApp" onclick="deleteCurrentApp()">🗑️ Eliminar del Catálogo</button>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="btn" onclick="closeAppModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary">✓ Aplicar en Catálogo</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: GitHub Token Configuration -->
+  <div class="modal-backdrop" id="tokenModalBackdrop">
+    <div class="modal" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3>🔑 Conectar Token de GitHub</h3>
+        <button class="btn" onclick="closeTokenModal()">✕</button>
+      </div>
+      <p style="font-size:0.86rem; color:var(--text-secondary); margin-bottom:14px;">
+        Para publicar cambios directamente en <code>Media-Hub-Site/MediaHub-Launcher/catalog.json</code> desde esta página web estática, ingresa un Personal Access Token (con permiso <code>repo</code> o <code>contents:write</code>). Se guarda únicamente en el <code>localStorage</code> de tu navegador.
+      </p>
+      <div class="form-group" style="margin-bottom:16px;">
+        <label>GitHub Personal Access Token (ghp_... / github_pat_...)</label>
+        <input type="password" class="form-control" id="ghTokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <button class="btn" onclick="clearToken()">Borrar Token</button>
+        <button class="btn btn-primary" onclick="saveToken()">Guardar en Navegador</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toastMsg"></div>
+
+  <script>
+    const ORG_NAME = "Media-Hub-Site";
+    const LAUNCHER_REPO = "Media-Hub-Site/MediaHub-Launcher";
+    const CATALOG_API = `https://api.github.com/repos/${LAUNCHER_REPO}/contents/catalog.json`;
+    const CATALOG_RAW = `https://raw.githubusercontent.com/${LAUNCHER_REPO}/main/catalog.json`;
+
+    let catalog = { schema_version: 1, sections: {}, apps: {} };
+    let currentFilter = "all";
+    let unsavedChanges = 0;
+    let editingAppId = null;
+
+    const CATEGORY_NAMES = {
+      tools: "🛠️ Herramientas",
+      studio: "🎙️ Estudio & Creadores",
+      admin: "📊 Administración",
+      games: "🎮 Juegos",
+    };
+
+    function showToast(msg, duration = 3400) {
+      const el = document.getElementById("toastMsg");
+      el.textContent = msg;
+      el.classList.add("show");
+      setTimeout(() => el.classList.remove("show"), duration);
+    }
+
+    function markChanged() {
+      unsavedChanges++;
+      const badge = document.getElementById("unsavedBadge");
+      badge.style.display = "inline-block";
+      badge.textContent = unsavedChanges;
+      updateKPIs();
+    }
+
+    function updateTokenButtonUI() {
+      const tok = localStorage.getItem("mediahub_gh_token");
+      const btn = document.getElementById("btnTokenStatus");
+      if (tok) {
+        btn.innerHTML = "🔑 Token Conectado ✓";
+        btn.style.borderColor = "var(--green)";
+      } else {
+        btn.innerHTML = "🔑 Token GitHub";
+        btn.style.borderColor = "";
+      }
+    }
+
+    async function loadCatalog() {
+      updateTokenButtonUI();
+      const headers = { "Accept": "application/vnd.github.raw+json" };
+      const tok = localStorage.getItem("mediahub_gh_token");
+      if (tok) headers["Authorization"] = `Bearer ${tok}`;
+
+      try {
+        const res = await fetch(`${CATALOG_API}?ref=main&t=${Date.now()}`, { headers, cache: "no-store" });
+        if (res.ok) {
+          catalog = await res.json();
+          renderCards();
+          updateKPIs();
+          return;
+        }
+      } catch (e) {}
+
+      try {
+        const res = await fetch(`${CATALOG_RAW}?t=${Date.now()}`, { cache: "no-store" });
+        if (res.ok) {
+          catalog = await res.json();
+          renderCards();
+          updateKPIs();
+          return;
+        }
+      } catch (e) {
+        showToast("No se pudo cargar catalog.json remoto.");
+      }
+    }
+
+    function updateKPIs() {
+      const entries = Object.values(catalog.apps || {});
+      const total = entries.length;
+      const visible = entries.filter(a => a.visible !== false);
+      const active = visible.filter(a => !a.is_disabled).length;
+      const disabled = visible.filter(a => a.is_disabled).length;
+      const hidden = entries.filter(a => a.visible === false).length;
+
+      document.getElementById("kpiTotal").textContent = total;
+      document.getElementById("kpiActive").textContent = active;
+      document.getElementById("kpiDisabled").textContent = disabled;
+      document.getElementById("kpiHidden").textContent = hidden;
+    }
+
+    function resolveIconUrl(app) {
+      if (app.icon_url) return app.icon_url;
+      const icon = app.icon || "media.png";
+      return `https://raw.githubusercontent.com/${LAUNCHER_REPO}/main/assets/hub/${icon}`;
+    }
+
+    function setFilterSection(sec, btnEl) {
+      currentFilter = sec;
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      btnEl.classList.add("active");
+      renderCards();
+    }
+
+    function renderCards() {
+      const grid = document.getElementById("cardsGrid");
+      const query = (document.getElementById("searchInput").value || "").trim().toLowerCase();
+      grid.innerHTML = "";
+
+      const apps = catalog.apps || {};
+      for (const [appId, app] of Object.entries(apps)) {
+        const isVisible = app.visible !== false;
+        if (currentFilter === "hidden" && isVisible) continue;
+        if (currentFilter !== "all" && currentFilter !== "hidden" && app.category !== currentFilter) continue;
+
+        const textBlob = `${appId} ${app.name_es || ""} ${app.name_en || ""} ${app.description_es || ""} ${app.badge_es || ""} ${app.repo || ""}`.toLowerCase();
+        if (query && !textBlob.includes(query)) continue;
+
+        const card = document.createElement("div");
+        card.className = `app-card ${!isVisible ? "hidden-app" : ""}`;
+
+        let stateBadge = `<span class="badge badge-green">🟢 Activa</span>`;
+        if (!isVisible) {
+          stateBadge = `<span class="badge badge-red">🔴 Oculta</span>`;
+        } else if (app.is_disabled) {
+          stateBadge = `<span class="badge badge-amber">🟡 Próximamente</span>`;
+        }
+
+        const catBadge = `<span class="badge badge-blue">${CATEGORY_NAMES[app.category] || app.category}</span>`;
+        const tagBadge = app.badge_es ? `<span class="badge badge-accent">${app.badge_es}</span>` : "";
+
+        card.innerHTML = `
+          <div>
+            <div class="card-top">
+              <img class="app-icon" src="${resolveIconUrl(app)}" onerror="this.src='https://raw.githubusercontent.com/${LAUNCHER_REPO}/main/assets/hub/media.png'" alt="icon" />
+              <div class="card-titles">
+                <div class="card-name-row">
+                  <span class="card-title">${app.name_es || appId}</span>
+                  ${tagBadge}
+                  ${stateBadge}
+                </div>
+                <div class="card-repo">${app.repo || ""} • <code>${app.exe || ""}</code></div>
+                <div style="margin-top:5px;">${catBadge}</div>
+              </div>
+            </div>
+            <p class="card-desc" style="margin-top:12px;">${app.description_es || ""}</p>
+          </div>
+
+          <div class="toggles-box">
+            <div class="toggle-row">
+              <span>👁️ Visible en MediaHub Launcher</span>
+              <label class="switch">
+                <input type="checkbox" ${isVisible ? "checked" : ""} onchange="toggleVisible('${appId}', this.checked)" />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <span>🚧 Modo "Próximamente" (Bloquear descarga)</span>
+              <label class="switch">
+                <input type="checkbox" ${app.is_disabled ? "checked" : ""} onchange="toggleDisabled('${appId}', this.checked)" />
+                <span class="slider slider-amber"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <span>⭐ Destacada en Sección (Hero Card)</span>
+              <label class="switch">
+                <input type="checkbox" ${app.is_hero ? "checked" : ""} onchange="toggleHero('${appId}', this.checked)" />
+                <span class="slider slider-accent"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <a class="btn" href="https://github.com/${app.repo}" target="_blank" rel="noopener">🔗 Repo GitHub</a>
+            <button class="btn" onclick="openAppModal('${appId}')">✏️ Editar Tarjeta</button>
+          </div>
+        `;
+        grid.appendChild(card);
+      }
+    }
+
+    function toggleVisible(appId, checked) {
+      if (!catalog.apps[appId]) return;
+      catalog.apps[appId].visible = checked;
+      markChanged();
+      renderCards();
+      showToast(`${catalog.apps[appId].name_es}: ${checked ? "Visible en el Launcher" : "Ocultada del Launcher"}`);
+    }
+
+    function toggleDisabled(appId, checked) {
+      if (!catalog.apps[appId]) return;
+      catalog.apps[appId].is_disabled = checked;
+      markChanged();
+      renderCards();
+      showToast(`${catalog.apps[appId].name_es}: ${checked ? "Marcada como Próximamente" : "Descarga habilitada"}`);
+    }
+
+    function toggleHero(appId, checked) {
+      if (!catalog.apps[appId]) return;
+      catalog.apps[appId].is_hero = checked;
+      markChanged();
+      renderCards();
+    }
+
+    /* Modal Editor */
+    function openAppModal(appId, prefill = null) {
+      editingAppId = appId;
+      const isEdit = Boolean(appId && catalog.apps[appId]);
+      const data = isEdit ? catalog.apps[appId] : (prefill || {
+        name_es: "", name_en: "", badge_es: "NUEVO", badge_en: "NEW",
+        description_es: "", description_en: "",
+        repo: `${ORG_NAME}/`, exe: "", dir: "MediaHub-", icon: "media.png",
+        icon_url: "", category: "tools", visible: true, is_disabled: false, is_hero: false
+      });
+
+      document.getElementById("modalTitle").textContent = isEdit
+        ? `✏️ Editar Tarjeta: ${data.name_es}`
+        : "➕ Agregar Nueva Aplicación al Launcher";
+
+      const idInput = document.getElementById("f_id");
+      idInput.value = appId || (prefill && prefill._suggested_id) || "";
+      idInput.readOnly = isEdit;
+
+      document.getElementById("f_category").value = data.category || "tools";
+      document.getElementById("f_name_es").value = data.name_es || "";
+      document.getElementById("f_name_en").value = data.name_en || data.name_es || "";
+      document.getElementById("f_badge_es").value = data.badge_es || "";
+      document.getElementById("f_badge_en").value = data.badge_en || data.badge_es || "";
+      document.getElementById("f_desc_es").value = data.description_es || "";
+      document.getElementById("f_desc_en").value = data.description_en || data.description_es || "";
+      document.getElementById("f_repo").value = data.repo || "";
+      document.getElementById("f_exe").value = data.exe || "";
+      document.getElementById("f_dir").value = data.dir || "";
+      document.getElementById("f_icon").value = data.icon || "media.png";
+      document.getElementById("f_icon_url").value = data.icon_url || "";
+
+      document.getElementById("btnDeleteApp").style.display = isEdit ? "inline-flex" : "none";
+      document.getElementById("appModalBackdrop").classList.add("open");
+    }
+
+    function closeAppModal() {
+      document.getElementById("appModalBackdrop").classList.remove("open");
+    }
+
+    function saveAppForm(e) {
+      e.preventDefault();
+      const id = document.getElementById("f_id").value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+      if (!id) return;
+
+      const existing = catalog.apps[id] || {};
+      catalog.apps[id] = {
+        ...existing,
+        name_es: document.getElementById("f_name_es").value.trim(),
+        name_en: document.getElementById("f_name_en").value.trim(),
+        description_es: document.getElementById("f_desc_es").value.trim(),
+        description_en: document.getElementById("f_desc_en").value.trim(),
+        badge_es: document.getElementById("f_badge_es").value.trim(),
+        badge_en: document.getElementById("f_badge_en").value.trim(),
+        category: document.getElementById("f_category").value,
+        repo: document.getElementById("f_repo").value.trim(),
+        exe: document.getElementById("f_exe").value.trim(),
+        dir: document.getElementById("f_dir").value.trim(),
+        icon: document.getElementById("f_icon").value.trim(),
+        icon_url: document.getElementById("f_icon_url").value.trim() || undefined,
+        visible: existing.visible !== undefined ? existing.visible : true,
+        is_disabled: existing.is_disabled !== undefined ? existing.is_disabled : false,
+        is_hero: existing.is_hero !== undefined ? existing.is_hero : false,
+      };
+
+      closeAppModal();
+      markChanged();
+      renderCards();
+      showToast(`✓ Tarjeta "${catalog.apps[id].name_es}" actualizada en el catálogo.`);
+    }
+
+    function deleteCurrentApp() {
+      if (!editingAppId || !catalog.apps[editingAppId]) return;
+      const name = catalog.apps[editingAppId].name_es || editingAppId;
+      if (!confirm(`¿Seguro que deseas eliminar "${name}" permanentemente del catálogo del Launcher?`)) return;
+      delete catalog.apps[editingAppId];
+      closeAppModal();
+      markChanged();
+      renderCards();
+      showToast(`🗑️ "${name}" eliminada del catálogo.`);
+    }
+
+    /* Organization Repo Auto-Discovery Radar */
+    async function scanOrganizationRepos() {
+      const panel = document.getElementById("scannerPanel");
+      const list = document.getElementById("scannerList");
+      const sub = document.getElementById("scannerSub");
+      panel.classList.add("open");
+      list.innerHTML = "";
+      sub.textContent = "Consultando repositorios de Media-Hub-Site en GitHub…";
+
+      const headers = {};
+      const tok = localStorage.getItem("mediahub_gh_token");
+      if (tok) headers["Authorization"] = `Bearer ${tok}`;
+
+      try {
+        const res = await fetch(`https://api.github.com/orgs/${ORG_NAME}/repos?per_page=100&sort=updated`, { headers });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const repos = await res.json();
+
+        const registeredRepos = new Set(
+          Object.values(catalog.apps || {}).map(a => (a.repo || "").toLowerCase())
+        );
+
+        const ignored = new Set([`${ORG_NAME}/mediahub-launcher`.toLowerCase(), `${ORG_NAME}/android`.toLowerCase()]);
+        let newCount = 0;
+
+        for (const r of repos) {
+          const fullLower = r.full_name.toLowerCase();
+          if (ignored.has(fullLower)) continue;
+          const isRegistered = registeredRepos.has(fullLower);
+          if (!isRegistered) newCount++;
+
+          const item = document.createElement("div");
+          item.className = "repo-chip";
+          const suggestedId = r.name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+          const iconLower = `${r.name.toLowerCase()}.png`;
+          const prefillObj = {
+            _suggested_id: suggestedId,
+            name_es: r.name,
+            name_en: r.name,
+            description_es: r.description || `Aplicación ${r.name} del ecosistema Media Hub.`,
+            description_en: r.description || `${r.name} application for the Media Hub ecosystem.`,
+            badge_es: "NUEVO",
+            badge_en: "NEW",
+            repo: r.full_name,
+            exe: `${r.name}.exe`,
+            dir: `MediaHub-${r.name}`,
+            icon: iconLower,
+            icon_url: `https://raw.githubusercontent.com/${r.full_name}/main/assets/hub/${iconLower}`,
+            category: "tools",
+          };
+
+          item.innerHTML = `
+            <div>
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <strong>${r.name}</strong>
+                ${isRegistered
+                  ? `<span class="badge badge-green">✓ En Catálogo</span>`
+                  : `<span class="badge badge-accent">✨ Nuevo Repo</span>`}
+              </div>
+              <div style="font-size:0.78rem; color:var(--text-secondary); margin-top:4px;">
+                ${r.description || "Sin descripción en GitHub"}
+              </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end;">
+              ${isRegistered
+                ? `<a class="btn" href="${r.html_url}" target="_blank">Ver Repo</a>`
+                : `<button class="btn btn-primary" onclick='openAppModal(null, ${JSON.stringify(prefillObj).replace(/'/g, "&#39;")})'>＋ Agregar al Launcher</button>`}
+            </div>
+          `;
+          list.appendChild(item);
+        }
+
+        sub.textContent = newCount > 0
+          ? `¡Se encontraron ${newCount} repositorio(s) nuevo(s) que aún no están en el Launcher!`
+          : `Todos los repositorios de escritorio de ${ORG_NAME} (${repos.length}) están sincronizados.`;
+      } catch (err) {
+        sub.textContent = `No se pudo escanear la organización: ${err.message}`;
+      }
+    }
+
+    /* Token Modal */
+    function openTokenModal() {
+      document.getElementById("ghTokenInput").value = localStorage.getItem("mediahub_gh_token") || "";
+      document.getElementById("tokenModalBackdrop").classList.add("open");
+    }
+
+    function closeTokenModal() {
+      document.getElementById("tokenModalBackdrop").classList.remove("open");
+    }
+
+    function saveToken() {
+      const val = document.getElementById("ghTokenInput").value.trim();
+      if (val) {
+        localStorage.setItem("mediahub_gh_token", val);
+        showToast("🔑 Token guardado en tu navegador.");
+      }
+      closeTokenModal();
+      updateTokenButtonUI();
+    }
+
+    function clearToken() {
+      localStorage.removeItem("mediahub_gh_token");
+      document.getElementById("ghTokenInput").value = "";
+      closeTokenModal();
+      updateTokenButtonUI();
+      showToast("Token eliminado del navegador.");
+    }
+
+    /* Export & Direct GitHub Commit */
+    function downloadCatalogJson() {
+      catalog.updated_at = new Date().toISOString();
+      const blob = new Blob([JSON.stringify(catalog, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "catalog.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function commitCatalogToBranch(branch, token, base64Content) {
+      const getRes = await fetch(`${CATALOG_API}?ref=${branch}`, {
+        headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" },
+        cache: "no-store",
+      });
+      let sha = undefined;
+      if (getRes.ok) {
+        const meta = await getRes.json();
+        sha = meta.sha;
+      }
+
+      const putRes = await fetch(CATALOG_API, {
+        method: "PUT",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/vnd.github+json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: `chore(catalog): update dynamic app catalog from Web Admin Panel`,
+          content: base64Content,
+          sha: sha,
+          branch: branch,
+        }),
+      });
+      if (!putRes.ok) {
+        const errData = await putRes.json().catch(() => ({}));
+        throw new Error(errData.message || `HTTP ${putRes.status}`);
+      }
+    }
+
+    async function publishToGitHub() {
+      const token = localStorage.getItem("mediahub_gh_token");
+      if (!token) {
+        openTokenModal();
+        showToast("🔑 Conecta primero tu Token de GitHub para publicar cambios.");
+        return;
+      }
+
+      const btn = document.getElementById("btnPublish");
+      btn.disabled = true;
+      btn.textContent = "⏳ Publicando en GitHub…";
+
+      try {
+        catalog.updated_at = new Date().toISOString();
+        const jsonStr = JSON.stringify(catalog, null, 2) + "\n";
+        const bytes = new TextEncoder().encode(jsonStr);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        const b64 = btoa(binary);
+
+        await commitCatalogToBranch("main", token, b64);
+        try {
+          await commitCatalogToBranch("develop", token, b64);
+        } catch (e) {}
+
+        unsavedChanges = 0;
+        const badge = document.getElementById("unsavedBadge");
+        if (badge) badge.style.display = "none";
+        showToast("✓ ¡Catálogo publicado! Los cambios ya están activos en MediaHub-Launcher.");
+      } catch (err) {
+        showToast(`❌ Error al publicar: ${err.message}`, 5000);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `💾 Publicar en Launcher <span id="unsavedBadge" style="display:none; background:#06140e; color:#34d399; padding:1px 7px; border-radius:99px; font-size:0.75rem;">0</span>`;
+      }
+    }
+
+    loadCatalog();
+  </script>
+</body>
+</html>

@@ -19,6 +19,7 @@ datas = [
     ('assets/icons', 'assets/icons'),
     ('assets/sounds', 'assets/sounds'),
     ('version.json', '.'),
+    ('catalog.json', '.'),
 ]
 
 a = Analysis(

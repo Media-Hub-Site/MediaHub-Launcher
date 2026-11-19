@@ -77,6 +77,11 @@ STRINGS = {
         "games_empty_desc": "Este espacio está reservado para la colección de juegos livianos de entretenimiento inmediato de Media Hub. ¡Próximamente disponibles para instalar!",
         "installed_empty_title": "Aún no tienes aplicaciones instaladas",
         "installed_empty_desc": "Explora las secciones de Herramientas, Estudio o Administración y haz clic en 'Instalar' para descargar tu primera app.",
+        "btn_sync_catalog": "🔄 Catálogo",
+        "btn_sync_catalog_tooltip": "Sincronizar tarjetas y aplicaciones desde el catálogo en la nube",
+        "btn_syncing": "⏳ Sincronizando…",
+        "dock_admin_panel": "⚙️ Panel Admin Web",
+        "dock_admin_panel_tooltip": "Abrir el administrador web de tarjetas de Media Hub en GitHub Pages",
     },
     "en": {
         "app_title": "Media Hub",
@@ -137,6 +142,11 @@ STRINGS = {
         "games_empty_desc": "This space is reserved for Media Hub's upcoming collection of lightweight instant-entertainment mini-games. Stay tuned!",
         "installed_empty_title": "No applications installed yet",
         "installed_empty_desc": "Explore the Tools, Studio or Management sections and click 'Install' to download your first app.",
+        "btn_sync_catalog": "🔄 Catalog",
+        "btn_sync_catalog_tooltip": "Sync app cards and catalog from the cloud",
+        "btn_syncing": "⏳ Syncing…",
+        "dock_admin_panel": "⚙️ Web Admin Panel",
+        "dock_admin_panel_tooltip": "Open Media Hub's web card manager on GitHub Pages",
     }
 }
 
