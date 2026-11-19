@@ -772,6 +772,19 @@
     let currentFilter = "all";
     let unsavedChanges = 0;
     let editingAppId = null;
+    let autoPublishTimer = null;
+
+    // 1. Auto-capturar token si viene en el hash (#token=...) desde MediaHub-Launcher
+    (function captureHashToken() {
+      const hash = window.location.hash || "";
+      if (hash.startsWith("#token=")) {
+        const tok = decodeURIComponent(hash.slice(7)).trim();
+        if (tok) {
+          localStorage.setItem("mediahub_gh_token", tok);
+        }
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+    })();
 
     const CATEGORY_NAMES = {
       tools: "🛠️ Herramientas",
@@ -790,9 +803,25 @@
     function markChanged() {
       unsavedChanges++;
       const badge = document.getElementById("unsavedBadge");
-      badge.style.display = "inline-block";
-      badge.textContent = unsavedChanges;
+      if (badge) {
+        badge.style.display = "inline-block";
+        badge.textContent = unsavedChanges;
+      }
       updateKPIs();
+      scheduleAutoPublish();
+    }
+
+    function scheduleAutoPublish() {
+      const tok = localStorage.getItem("mediahub_gh_token");
+      if (!tok) {
+        openTokenModal();
+        showToast("⚠️ Conecta tu Token de GitHub para que los cambios se publiquen en tu Launcher.", 4800);
+        return;
+      }
+      if (autoPublishTimer) clearTimeout(autoPublishTimer);
+      autoPublishTimer = setTimeout(() => {
+        publishToGitHub();
+      }, 550);
     }
 
     function updateTokenButtonUI() {
@@ -1139,10 +1168,13 @@
       const val = document.getElementById("ghTokenInput").value.trim();
       if (val) {
         localStorage.setItem("mediahub_gh_token", val);
-        showToast("🔑 Token guardado en tu navegador.");
+        showToast("🔑 Token guardado. Publicando cambios pendientes…");
       }
       closeTokenModal();
       updateTokenButtonUI();
+      if (val && unsavedChanges > 0) {
+        publishToGitHub();
+      }
     }
 
     function clearToken() {
@@ -1166,7 +1198,7 @@
     }
 
     async function commitCatalogToBranch(branch, token, base64Content) {
-      const getRes = await fetch(`${CATALOG_API}?ref=${branch}`, {
+      const getRes = await fetch(`${CATALOG_API}?ref=${branch}&t=${Date.now()}`, {
         headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" },
         cache: "no-store",
       });
