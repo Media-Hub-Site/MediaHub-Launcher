@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T03:05:46.132Z",
+  "updated_at": "2026-11-19T03:06:03.421Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -60,7 +60,7 @@
       "badge_en": "9 IN 1",
       "category": "tools",
       "is_hero": false,
-      "is_disabled": false,
+      "is_disabled": true,
       "visible": true
     },
     "image_tools": {
