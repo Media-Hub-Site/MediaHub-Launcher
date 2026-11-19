@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T03:15:56.675Z",
+  "updated_at": "2026-11-19T03:43:21.661Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -279,6 +279,22 @@
       "icon": "rpgterminal.png",
       "visible": true,
       "is_disabled": true,
+      "is_hero": false
+    },
+    "musical_midi": {
+      "name_es": "MusicalMIDI",
+      "name_en": "MusicalMIDI",
+      "description_es": "Herramienta MIDI para comunicar el Piano al PC",
+      "description_en": "MIDI tool for communicating between the piano and the PC",
+      "badge_es": "NUEVO",
+      "badge_en": "NEW",
+      "category": "studio",
+      "repo": "Media-Hub-Site/MusicalMIDI",
+      "exe": "MusicalMIDI",
+      "dir": "MediaHub-MusicalMIDI",
+      "icon": "musicalmidi.png",
+      "visible": true,
+      "is_disabled": false,
       "is_hero": false
     }
   }
