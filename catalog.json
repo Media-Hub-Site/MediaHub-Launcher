@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T04:15:02.718Z",
+  "updated_at": "2026-11-19T04:15:23.366Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -160,7 +160,7 @@
       "visible": true
     },
     "audiolab": {
-      "name_es": "AudioLab",
+      "name_es": "Laboratorio de Audio",
       "name_en": "AudioLab",
       "description_es": "Laboratorio de síntesis matemática, fórmulas Bytebeat y efectos procedurales SFX.",
       "description_en": "Mathematical sound synthesis studio, Bytebeat formulas and procedural SFX.",
