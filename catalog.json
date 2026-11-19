@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T03:05:02.465Z",
+  "updated_at": "2026-11-19T03:05:15.365Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -173,7 +173,7 @@
       "category": "studio",
       "is_hero": false,
       "is_disabled": false,
-      "visible": false
+      "visible": true
     },
     "musical_trainer": {
       "name_es": "MusicalTrainer",
