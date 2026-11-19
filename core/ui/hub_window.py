@@ -1173,8 +1173,23 @@ class HubWindow(QMainWindow):
 
     def _open_admin_panel(self):
         SoundManager.instance().play("click")
+        url = ADMIN_PANEL_URL
+        tok = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
+        if not tok:
+            try:
+                cflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+                tok = subprocess.check_output(
+                    ["gh", "auth", "token"],
+                    text=True,
+                    timeout=3,
+                    creationflags=cflags,
+                ).strip()
+            except Exception:
+                tok = ""
+        if tok:
+            url = f"{ADMIN_PANEL_URL}#token={tok}"
         try:
-            webbrowser.open(ADMIN_PANEL_URL)
+            webbrowser.open(url)
         except Exception:
             pass
 

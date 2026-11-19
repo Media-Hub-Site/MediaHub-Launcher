@@ -741,21 +741,28 @@
 
   <!-- Modal: GitHub Token Configuration -->
   <div class="modal-backdrop" id="tokenModalBackdrop">
-    <div class="modal" style="max-width: 500px;">
+    <div class="modal" style="max-width: 520px;">
       <div class="modal-header">
         <h3>🔑 Conectar Token de GitHub</h3>
         <button class="btn" onclick="closeTokenModal()">✕</button>
       </div>
-      <p style="font-size:0.86rem; color:var(--text-secondary); margin-bottom:14px;">
-        Para publicar cambios directamente en <code>Media-Hub-Site/MediaHub-Launcher/catalog.json</code> desde esta página web estática, ingresa un Personal Access Token (con permiso <code>repo</code> o <code>contents:write</code>). Se guarda únicamente en el <code>localStorage</code> de tu navegador.
+      <p style="font-size:0.86rem; color:var(--text-secondary); margin-bottom:14px; line-height: 1.5;">
+        Para publicar cambios directamente en <code>Media-Hub-Site/MediaHub-Launcher/catalog.json</code> desde esta página, ingresa tu token de GitHub (personal o de CLI, con permiso <code>repo</code>). Se guarda únicamente en tu navegador.
       </p>
-      <div class="form-group" style="margin-bottom:16px;">
-        <label>GitHub Personal Access Token (ghp_... / github_pat_...)</label>
-        <input type="password" class="form-control" id="ghTokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+      <div class="form-group" style="margin-bottom:14px;">
+        <label>GitHub Access Token (gho_... / ghp_... / github_pat_...)</label>
+        <div style="display:flex; gap:8px;">
+          <input type="password" class="form-control" id="ghTokenInput" style="flex:1; font-family:monospace; font-size:0.88rem;" placeholder="Pega tu token aquí..." />
+          <button type="button" class="btn" onclick="toggleTokenVisibility()" id="btnToggleVisibility" title="Mostrar/Ocultar Token" style="padding: 0 12px;">👁️</button>
+        </div>
+        <div id="tokenVerifyStatus" style="font-size:0.84rem; margin-top:8px; padding: 8px 12px; border-radius: var(--radius-sm); display:none; background: var(--bg-card); border: 1px solid var(--border);"></div>
       </div>
-      <div style="display:flex; justify-content:flex-end; gap:10px;">
-        <button class="btn" onclick="clearToken()">Borrar Token</button>
-        <button class="btn btn-primary" onclick="saveToken()">Guardar en Navegador</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:16px;">
+        <button class="btn" type="button" onclick="testCurrentToken()" id="btnTestToken">🧪 Probar Token</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" type="button" onclick="clearToken()">Borrar</button>
+          <button class="btn btn-primary" type="button" onclick="saveToken()">Guardar y Conectar</button>
+        </div>
       </div>
     </div>
   </div>
@@ -772,6 +779,24 @@
     let currentFilter = "all";
     let unsavedChanges = 0;
     let editingAppId = null;
+    let autoPublishTimer = null;
+
+    function cleanToken(raw) {
+      if (!raw) return "";
+      return String(raw).trim().replace(/^["']|["']$/g, "").trim();
+    }
+
+    // 1. Auto-capturar token si viene en el hash (#token=...) desde MediaHub-Launcher
+    (function captureHashToken() {
+      const hash = window.location.hash || "";
+      if (hash.startsWith("#token=")) {
+        const tok = cleanToken(decodeURIComponent(hash.slice(7)));
+        if (tok) {
+          localStorage.setItem("mediahub_gh_token", tok);
+        }
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+    })();
 
     const CATEGORY_NAMES = {
       tools: "🛠️ Herramientas",
@@ -790,9 +815,25 @@
     function markChanged() {
       unsavedChanges++;
       const badge = document.getElementById("unsavedBadge");
-      badge.style.display = "inline-block";
-      badge.textContent = unsavedChanges;
+      if (badge) {
+        badge.style.display = "inline-block";
+        badge.textContent = unsavedChanges;
+      }
       updateKPIs();
+      scheduleAutoPublish();
+    }
+
+    function scheduleAutoPublish() {
+      const tok = localStorage.getItem("mediahub_gh_token");
+      if (!tok) {
+        openTokenModal();
+        showToast("⚠️ Conecta tu Token de GitHub para que los cambios se publiquen en tu Launcher.", 4800);
+        return;
+      }
+      if (autoPublishTimer) clearTimeout(autoPublishTimer);
+      autoPublishTimer = setTimeout(() => {
+        publishToGitHub();
+      }, 550);
     }
 
     function updateTokenButtonUI() {
@@ -1125,9 +1166,28 @@
       }
     }
 
-    /* Token Modal */
+    /* Token Modal & Verification */
+    function toggleTokenVisibility() {
+      const inp = document.getElementById("ghTokenInput");
+      const btn = document.getElementById("btnToggleVisibility");
+      if (inp.type === "password") {
+        inp.type = "text";
+        btn.textContent = "🙈";
+      } else {
+        inp.type = "password";
+        btn.textContent = "👁️";
+      }
+    }
+
     function openTokenModal() {
-      document.getElementById("ghTokenInput").value = localStorage.getItem("mediahub_gh_token") || "";
+      const current = localStorage.getItem("mediahub_gh_token") || "";
+      document.getElementById("ghTokenInput").value = current;
+      const statusEl = document.getElementById("tokenVerifyStatus");
+      if (current) {
+        testCurrentToken();
+      } else {
+        statusEl.style.display = "none";
+      }
       document.getElementById("tokenModalBackdrop").classList.add("open");
     }
 
@@ -1135,20 +1195,72 @@
       document.getElementById("tokenModalBackdrop").classList.remove("open");
     }
 
-    function saveToken() {
-      const val = document.getElementById("ghTokenInput").value.trim();
+    async function testCurrentToken() {
+      const val = cleanToken(document.getElementById("ghTokenInput").value);
+      const statusEl = document.getElementById("tokenVerifyStatus");
+      statusEl.style.display = "block";
+
+      if (!val) {
+        statusEl.innerHTML = `<span style="color:var(--amber);">⚠️ El campo del token está vacío. Pega tu token antes de probarlo.</span>`;
+        return false;
+      }
+
+      statusEl.innerHTML = `<span style="color:var(--accent);">⏳ Conectando con GitHub API para verificar...</span>`;
+
+      try {
+        const res = await fetch("https://api.github.com/user", {
+          headers: {
+            "Authorization": `Bearer ${val}`,
+            "Accept": "application/vnd.github+json"
+          }
+        });
+
+        if (res.status === 401) {
+          statusEl.innerHTML = `<span style="color:var(--red);">❌ <strong>Error 401 (Bad credentials)</strong>: GitHub rechazó este token. Asegúrate de copiarlo completo sin espacios, o genera uno nuevo en GitHub Settings.</span>`;
+          return false;
+        }
+
+        if (!res.ok) {
+          statusEl.innerHTML = `<span style="color:var(--red);">❌ Error de GitHub: HTTP ${res.status}</span>`;
+          return false;
+        }
+
+        const user = await res.json();
+        const scopes = res.headers.get("x-oauth-scopes") || "gho_oauth";
+        statusEl.innerHTML = `<span style="color:var(--green);">✅ <strong>¡Token válido y verificado!</strong> Conectado como <code>@${user.login}</code> (Permisos: <code>${scopes}</code>)</span>`;
+        return true;
+      } catch (err) {
+        statusEl.innerHTML = `<span style="color:var(--red);">❌ No se pudo conectar con GitHub: ${err.message}</span>`;
+        return false;
+      }
+    }
+
+    async function saveToken() {
+      const val = cleanToken(document.getElementById("ghTokenInput").value);
       if (val) {
         localStorage.setItem("mediahub_gh_token", val);
-        showToast("🔑 Token guardado en tu navegador.");
+        showToast("🔑 Token guardado. Verificando...");
+        const ok = await testCurrentToken();
+        if (ok) {
+          closeTokenModal();
+          updateTokenButtonUI();
+          showToast("✓ ¡Token conectado y verificado con éxito!");
+          if (unsavedChanges > 0) {
+            publishToGitHub();
+          }
+          return;
+        }
+      } else {
+        clearToken();
       }
-      closeTokenModal();
       updateTokenButtonUI();
     }
 
     function clearToken() {
       localStorage.removeItem("mediahub_gh_token");
       document.getElementById("ghTokenInput").value = "";
-      closeTokenModal();
+      const statusEl = document.getElementById("tokenVerifyStatus");
+      statusEl.style.display = "none";
       updateTokenButtonUI();
       showToast("Token eliminado del navegador.");
     }
@@ -1166,10 +1278,13 @@
     }
 
     async function commitCatalogToBranch(branch, token, base64Content) {
-      const getRes = await fetch(`${CATALOG_API}?ref=${branch}`, {
+      const getRes = await fetch(`${CATALOG_API}?ref=${branch}&t=${Date.now()}`, {
         headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" },
         cache: "no-store",
       });
+      if (getRes.status === 401) {
+        throw new Error("HTTP 401 (Bad credentials): Tu token de GitHub no es válido o ha expirado.");
+      }
       let sha = undefined;
       if (getRes.ok) {
         const meta = await getRes.json();
@@ -1190,6 +1305,9 @@
           branch: branch,
         }),
       });
+      if (putRes.status === 401) {
+        throw new Error("HTTP 401 (Bad credentials): Tu token de GitHub no tiene permisos o es inválido.");
+      }
       if (!putRes.ok) {
         const errData = await putRes.json().catch(() => ({}));
         throw new Error(errData.message || `HTTP ${putRes.status}`);
@@ -1197,7 +1315,7 @@
     }
 
     async function publishToGitHub() {
-      const token = localStorage.getItem("mediahub_gh_token");
+      const token = cleanToken(localStorage.getItem("mediahub_gh_token"));
       if (!token) {
         openTokenModal();
         showToast("🔑 Conecta primero tu Token de GitHub para publicar cambios.");
@@ -1226,7 +1344,12 @@
         if (badge) badge.style.display = "none";
         showToast("✓ ¡Catálogo publicado! Los cambios ya están activos en MediaHub-Launcher.");
       } catch (err) {
-        showToast(`❌ Error al publicar: ${err.message}`, 5000);
+        if (err.message && err.message.includes("401")) {
+          showToast(`❌ Error 401: Token inválido. Haz clic en "🔑 Token GitHub" para corregirlo.`, 6000);
+          openTokenModal();
+        } else {
+          showToast(`❌ Error al publicar: ${err.message}`, 5000);
+        }
       } finally {
         btn.disabled = false;
         btn.innerHTML = `💾 Publicar en Launcher <span id="unsavedBadge" style="display:none; background:#06140e; color:#34d399; padding:1px 7px; border-radius:99px; font-size:0.75rem;">0</span>`;
