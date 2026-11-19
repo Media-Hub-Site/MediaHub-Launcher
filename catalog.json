@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T04:15:42.509Z",
+  "updated_at": "2026-11-19T04:16:10.783Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -19,7 +19,7 @@
     },
     "studio": {
       "icon": "🎙️",
-      "name_es": "Estudio & Creadores",
+      "name_es": "Estudio",
       "name_en": "Creator Studio",
       "desc_es": "Herramientas avanzadas de streaming, alertas con voces IA, síntesis sonora y conservatorio musical interactivo.",
       "desc_en": "Advanced streaming tools, AI voice alerts, mathematical sound synthesis and interactive music conservatory."
