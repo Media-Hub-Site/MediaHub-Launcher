@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T04:17:49.644Z",
+  "updated_at": "2026-11-19T04:18:39.947Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -46,7 +46,7 @@
       "desc_en": "Applications currently installed and ready to launch on this PC."
     },
     "security": {
-      "icon": "📁",
+      "icon": "🛡️",
       "name_es": "Seguridad",
       "name_en": "Security",
       "desc_es": "Herramientas de seguridad, analisis y detección de virus, malware, etc",
