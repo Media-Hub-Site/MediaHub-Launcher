@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T04:18:39.947Z",
+  "updated_at": "2026-11-19T04:18:53.731Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -241,7 +241,7 @@
       "icon": "blueguard.png",
       "badge_es": "SEGURIDAD",
       "badge_en": "SECURITY",
-      "category": "admin",
+      "category": "security",
       "is_hero": false,
       "is_disabled": true,
       "visible": true
