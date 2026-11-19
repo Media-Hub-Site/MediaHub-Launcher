@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T03:05:28.887Z",
+  "updated_at": "2026-11-19T03:05:30.370Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -221,7 +221,7 @@
       "category": "admin",
       "is_hero": false,
       "is_disabled": false,
-      "visible": false
+      "visible": true
     },
     "blueguard": {
       "name_es": "BlueGuard",
@@ -237,7 +237,7 @@
       "category": "admin",
       "is_hero": false,
       "is_disabled": false,
-      "visible": false
+      "visible": true
     },
     "pokebinder": {
       "name_es": "PokeBinder Inventory",
