@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T06:46:46.848Z",
+  "updated_at": "2026-11-19T06:46:51.554Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -10,19 +10,19 @@
       "desc_es": "Todas las aplicaciones organizadas por secciones dentro del ecosistema Media Hub.",
       "desc_en": "All applications organized by sections across the Media Hub ecosystem."
     },
-    "studio": {
-      "icon": "🎙️",
-      "name_es": "Estudio",
-      "name_en": "Creator Studio",
-      "desc_es": "Herramientas avanzadas de streaming, alertas con voces IA, síntesis sonora y conservatorio musical interactivo.",
-      "desc_en": "Advanced streaming tools, AI voice alerts, mathematical sound synthesis and interactive music conservatory."
-    },
     "tools": {
       "icon": "🛠️",
       "name_es": "Herramientas",
       "name_en": "Tools",
       "desc_es": "Conversión multimedia, documentos, enlaces, imágenes, subtítulos IA y personalización tipográfica.",
       "desc_en": "Multimedia conversion, documents, links, images, AI subtitles and custom typography."
+    },
+    "studio": {
+      "icon": "🎙️",
+      "name_es": "Estudio",
+      "name_en": "Creator Studio",
+      "desc_es": "Herramientas avanzadas de streaming, alertas con voces IA, síntesis sonora y conservatorio musical interactivo.",
+      "desc_en": "Advanced streaming tools, AI voice alerts, mathematical sound synthesis and interactive music conservatory."
     },
     "admin": {
       "icon": "📊",
@@ -31,19 +31,19 @@
       "desc_es": "Finanzas personales, planimetría técnica para construcción, inventario y defensa de ciberseguridad.",
       "desc_en": "Personal finance, technical architectural blueprints, inventory and Blue Team cybersecurity."
     },
-    "games": {
-      "icon": "🎮",
-      "name_es": "Juegos",
-      "name_en": "Games",
-      "desc_es": "Colección de mini-juegos livianos para entretenimiento inmediato.",
-      "desc_en": "Collection of lightweight mini-games for instant entertainment."
-    },
     "security": {
       "icon": "🛡️",
       "name_es": "Seguridad",
       "name_en": "Security",
       "desc_es": "Herramientas de seguridad, analisis y detección de virus, malware, etc",
       "desc_en": "Security tools, analysis and detection of virus, malware, etc."
+    },
+    "games": {
+      "icon": "🎮",
+      "name_es": "Juegos",
+      "name_en": "Games",
+      "desc_es": "Colección de mini-juegos livianos para entretenimiento inmediato.",
+      "desc_en": "Collection of lightweight mini-games for instant entertainment."
     },
     "installed": {
       "icon": "✓",
