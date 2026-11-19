@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T04:21:28.233Z",
+  "updated_at": "2026-11-19T05:09:07.414Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -51,6 +51,13 @@
       "name_en": "Security",
       "desc_es": "Herramientas de seguridad, analisis y detección de virus, malware, etc",
       "desc_en": "Security tools, analysis and detection of virus, malware, etc."
+    },
+    "test": {
+      "icon": "📁",
+      "name_es": "test",
+      "name_en": "test",
+      "desc_es": "test",
+      "desc_en": "test"
     }
   },
   "apps": {
