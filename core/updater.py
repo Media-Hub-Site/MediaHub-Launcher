@@ -190,11 +190,36 @@ class CheckUpdateThread(QThread):
 
     def run(self):
         try:
-            response = requests.get(API_URL, timeout=5)
-            response.raise_for_status()
-            data = response.json()
+            headers = {"User-Agent": "MediaHub-Launcher"}
+            token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
 
-            lat_v = extract_version_from_release(data)
+            data = None
+            lat_v = ""
+            raw_tag = ""
+
+            # 1. Consultar redirección 302 directa de GitHub (0 consumo de rate-limit API)
+            try:
+                rel_url = f"https://github.com/{GITHUB_REPO}/releases/latest"
+                head_res = requests.head(rel_url, headers=headers, allow_redirects=False, timeout=5)
+                loc = head_res.headers.get("Location", "")
+                if "/releases/tag/" in loc:
+                    raw_tag = loc.split("/releases/tag/")[-1].split("?")[0].strip()
+                    m = re.search(r"v?([\d.]+)", raw_tag)
+                    if m:
+                        lat_v = m.group(1)
+            except Exception:
+                pass
+
+            # 2. Si no se obtuvo por redirección, consultar API REST
+            if not lat_v:
+                response = requests.get(API_URL, headers=headers, timeout=5)
+                response.raise_for_status()
+                data = response.json()
+                lat_v = extract_version_from_release(data)
+                raw_tag = data.get("tag_name", f"v{lat_v}")
+
             if not lat_v:
                 return
 
@@ -222,19 +247,32 @@ class CheckUpdateThread(QThread):
                     is_newer = True
 
             if is_newer:
-                description = data.get("body", "No hay descripción disponible.")
-                assets = data.get("assets", [])
-                download_url = None
-                size_mb = 0
+                if data is None:
+                    try:
+                        r_api = requests.get(API_URL, headers=headers, timeout=5)
+                        if r_api.status_code == 200:
+                            data = r_api.json()
+                    except Exception:
+                        data = None
 
-                for asset in assets:
-                    if asset.get("name", "").endswith(".exe"):
-                        download_url = asset.get("browser_download_url")
-                        size_mb = asset.get("size", 0) / (1024 * 1024)
-                        break
+                if isinstance(data, dict):
+                    description = data.get("body", "Nueva versión de Media Hub disponible.")
+                    assets = data.get("assets", [])
+                    download_url = None
+                    size_mb = 0.0
+                    for asset in assets:
+                        if asset.get("name", "").endswith(".exe"):
+                            download_url = asset.get("browser_download_url")
+                            size_mb = asset.get("size", 0) / (1024 * 1024)
+                            break
+                else:
+                    tag_str = raw_tag or f"v{lat_v}"
+                    description = f"Nueva actualización v{lat_v} de Media Hub Launcher disponible."
+                    download_url = f"https://github.com/{GITHUB_REPO}/releases/download/{tag_str}/MediaHubInstaller.exe"
+                    size_mb = 32.8
 
                 if download_url:
                     self.update_available.emit(lat_v, description, download_url, size_mb)
 
-        except Exception as e:
-            print(f"Update check failed: {e}")
+        except Exception:
+            pass
