@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T03:43:53.108Z",
+  "updated_at": "2026-11-19T04:14:03.599Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -240,8 +240,8 @@
       "visible": true
     },
     "pokebinder": {
-      "name_es": "PokeBinder Inventory",
-      "name_en": "PokeBinder Inventory",
+      "name_es": "PokeBinder",
+      "name_en": "PokeBinder",
       "description_es": "Organizador visual de carpetas Pokémon TCG, cotización de cartas, mazos e inventario.",
       "description_en": "Visual Pokémon TCG binder organizer, card pricing, decks and inventory tracker.",
       "repo": "Media-Hub-Site/PokeBinderInventory",
