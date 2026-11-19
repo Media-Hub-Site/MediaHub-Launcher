@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T03:13:51.508Z",
+  "updated_at": "2026-11-19T03:14:57.138Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -120,8 +120,8 @@
       "exe": "MediaHub-LinkConverter.exe",
       "dir": "MediaHub-LinkConverter",
       "icon": "link_converter.webp",
-      "badge_es": "BATCH",
-      "badge_en": "BATCH",
+      "badge_es": "DESCARGA",
+      "badge_en": "DOWNLOAD",
       "category": "tools",
       "is_hero": false,
       "is_disabled": false,
