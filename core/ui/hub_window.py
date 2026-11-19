@@ -1026,35 +1026,18 @@ class HubWindow(QMainWindow):
         self.sidebar_frame = QFrame()
         self.sidebar_frame.setObjectName("hubSidebar")
         self.sidebar_frame.setFixedWidth(220)
-        sidebar_layout = QVBoxLayout(self.sidebar_frame)
-        sidebar_layout.setContentsMargins(12, 16, 12, 16)
-        sidebar_layout.setSpacing(6)
+        self.sidebar_layout = QVBoxLayout(self.sidebar_frame)
+        self.sidebar_layout.setContentsMargins(12, 16, 12, 16)
+        self.sidebar_layout.setSpacing(6)
 
         self.sidebar_title_lbl = QLabel(t("sidebar_header"))
-        sidebar_layout.addWidget(self.sidebar_title_lbl)
+        self.sidebar_layout.addWidget(self.sidebar_title_lbl)
 
         self._sidebar_btns: dict[str, QPushButton] = {}
-        sidebar_order = ["all", "tools", "studio", "admin", "games"]
-        for sec_id in sidebar_order:
-            btn = QPushButton()
-            btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.clicked.connect(lambda checked, sid=sec_id: self._select_section(sid))
-            sidebar_layout.addWidget(btn)
-            self._sidebar_btns[sec_id] = btn
-
         self.sidebar_sep = QFrame()
         self.sidebar_sep.setFixedHeight(1)
-        sidebar_layout.addSpacing(4)
-        sidebar_layout.addWidget(self.sidebar_sep)
-        sidebar_layout.addSpacing(4)
+        self._sync_sidebar_category_buttons()
 
-        btn_inst = QPushButton()
-        btn_inst.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_inst.clicked.connect(lambda checked: self._select_section("installed"))
-        sidebar_layout.addWidget(btn_inst)
-        self._sidebar_btns["installed"] = btn_inst
-
-        sidebar_layout.addStretch()
         body_layout.addWidget(self.sidebar_frame)
 
         # 2. Área Desplazable con Secciones y Tarjetas Bento
@@ -1099,6 +1082,9 @@ class HubWindow(QMainWindow):
         self.admin_panel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.admin_panel_btn.setToolTip(t("dock_admin_panel_tooltip"))
         self.admin_panel_btn.clicked.connect(self._open_admin_panel)
+        # Solo visible si se detecta autenticación de administrador (Issue: admin privado)
+        if not self._is_admin_user():
+            self.admin_panel_btn.hide()
         dock_layout.addWidget(self.admin_panel_btn)
 
         self.feedback_btn = QPushButton(t("dock_feedback"))
@@ -1134,7 +1120,14 @@ class HubWindow(QMainWindow):
         self.lbl_games_empty_desc = None
 
         curr_lang = get_current_language()
-        content_sections = ["tools", "studio", "admin", "games"]
+        # Obtener secciones de contenido dinámicamente desde SECTION_CATEGORIES (omitiendo 'all' e 'installed')
+        reserved_sec = {"all", "installed"}
+        content_sections = [sid for sid in SECTION_CATEGORIES.keys() if sid not in reserved_sec]
+        if not content_sections:
+            content_sections = ["tools", "studio", "admin", "games"]
+
+        # Reconstruir botones del Sidebar si cambiaron las categorías
+        self._sync_sidebar_category_buttons()
 
         for sec_id in content_sections:
             sec_meta = get_section_metadata(sec_id, curr_lang)
@@ -1266,6 +1259,25 @@ class HubWindow(QMainWindow):
         if vbar is not None:
             QTimer.singleShot(0, lambda pos=saved_scroll: vbar.setValue(pos))
 
+    def _is_admin_user(self) -> bool:
+        """Determina si el usuario actual es administrador (cuenta con GitHub CLI o token configurado)."""
+        if os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN"):
+            return True
+        admin_flag = os.path.join(get_hub_data_dir(), "admin_mode")
+        if os.path.isfile(admin_flag):
+            return True
+        try:
+            cflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+            tok = subprocess.check_output(
+                ["gh", "auth", "token"],
+                text=True,
+                timeout=2,
+                creationflags=cflags,
+            ).strip()
+            return bool(tok)
+        except Exception:
+            return False
+
     def _open_admin_panel(self):
         SoundManager.instance().play("click")
         url = ADMIN_PANEL_URL
@@ -1344,18 +1356,61 @@ class HubWindow(QMainWindow):
         self.installed_empty_card.setVisible(sec_filter == "installed" and total_installed_visible == 0)
         self._update_sidebar_texts()
 
+    def _sync_sidebar_category_buttons(self):
+        """Sincroniza y reordena dinámicamente los botones de categorías del sidebar según SECTION_CATEGORIES."""
+        if not hasattr(self, "sidebar_layout"):
+            return
+
+        # Limpiar layout del sidebar preservando título
+        while self.sidebar_layout.count() > 1:
+            it = self.sidebar_layout.takeAt(1)
+            w = it.widget()
+            if w is not None and w is not self.sidebar_title_lbl:
+                w.hide()
+                w.setParent(None)
+                w.deleteLater()
+
+        self._sidebar_btns.clear()
+
+        # Determinar orden dinámico de categorías
+        sidebar_order = ["all"]
+        reserved = {"all", "installed"}
+        for sid in SECTION_CATEGORIES.keys():
+            if sid not in reserved and sid not in sidebar_order:
+                sidebar_order.append(sid)
+
+        for sec_id in sidebar_order:
+            btn = QPushButton()
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda checked, sid=sec_id: self._select_section(sid))
+            self.sidebar_layout.addWidget(btn)
+            self._sidebar_btns[sec_id] = btn
+
+        self.sidebar_sep = QFrame()
+        self.sidebar_sep.setFixedHeight(1)
+        self.sidebar_layout.addSpacing(4)
+        self.sidebar_layout.addWidget(self.sidebar_sep)
+        self.sidebar_layout.addSpacing(4)
+
+        btn_inst = QPushButton()
+        btn_inst.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_inst.clicked.connect(lambda checked: self._select_section("installed"))
+        self.sidebar_layout.addWidget(btn_inst)
+        self._sidebar_btns["installed"] = btn_inst
+
+        self.sidebar_layout.addStretch()
+
     def _update_sidebar_texts(self):
         curr_lang = get_current_language()
         self.sidebar_title_lbl.setText(t("sidebar_header"))
 
         counts = {
             "all": len(APP_REGISTRY),
-            "tools": sum(1 for v in APP_REGISTRY.values() if v.get("category") == "tools"),
-            "studio": sum(1 for v in APP_REGISTRY.values() if v.get("category") == "studio"),
-            "admin": sum(1 for v in APP_REGISTRY.values() if v.get("category") == "admin"),
-            "games": sum(1 for v in APP_REGISTRY.values() if v.get("category") == "games"),
             "installed": sum(1 for aid in APP_REGISTRY if get_app_exe(aid) is not None),
         }
+        for sec_id in SECTION_CATEGORIES.keys():
+            if sec_id not in ("all", "installed"):
+                counts[sec_id] = sum(1 for v in APP_REGISTRY.values() if v.get("category") == sec_id)
 
         for sec_id, btn in self._sidebar_btns.items():
             meta = get_section_metadata(sec_id, curr_lang)

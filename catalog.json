@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T01:55:03.110Z",
+  "updated_at": "2026-11-19T04:21:28.233Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -19,7 +19,7 @@
     },
     "studio": {
       "icon": "🎙️",
-      "name_es": "Estudio & Creadores",
+      "name_es": "Estudio",
       "name_en": "Creator Studio",
       "desc_es": "Herramientas avanzadas de streaming, alertas con voces IA, síntesis sonora y conservatorio musical interactivo.",
       "desc_en": "Advanced streaming tools, AI voice alerts, mathematical sound synthesis and interactive music conservatory."
@@ -44,6 +44,13 @@
       "name_en": "Installed",
       "desc_es": "Aplicaciones descargadas y listas para abrir en este equipo.",
       "desc_en": "Applications currently installed and ready to launch on this PC."
+    },
+    "security": {
+      "icon": "🛡️",
+      "name_es": "Seguridad",
+      "name_en": "Security",
+      "desc_es": "Herramientas de seguridad, analisis y detección de virus, malware, etc",
+      "desc_en": "Security tools, analysis and detection of virus, malware, etc."
     }
   },
   "apps": {
@@ -88,9 +95,9 @@
       "exe": "MediaHub-SubtitleGenerator.exe",
       "dir": "MediaHub-SubtitleGenerator",
       "icon": "subtitle.png",
-      "badge_es": "IA LOCAL",
-      "badge_en": "LOCAL AI",
-      "category": "tools",
+      "badge_es": "EDICIÓN",
+      "badge_en": "EDITION",
+      "category": "studio",
       "is_hero": false,
       "is_disabled": false,
       "visible": true
@@ -120,15 +127,15 @@
       "exe": "MediaHub-LinkConverter.exe",
       "dir": "MediaHub-LinkConverter",
       "icon": "link_converter.webp",
-      "badge_es": "BATCH",
-      "badge_en": "BATCH",
+      "badge_es": "DESCARGA",
+      "badge_en": "DOWNLOAD",
       "category": "tools",
       "is_hero": false,
       "is_disabled": false,
       "visible": true
     },
     "font_family": {
-      "name_es": "FontFamily Atelier",
+      "name_es": "Taller de Fuentes",
       "name_en": "FontFamily Atelier",
       "description_es": "Estudio editorial de fuentes Unicode, caracteres invisibles, símbolos raros, marcos y emojis.",
       "description_en": "Editorial Unicode typography studio, invisible characters, rare symbols, frames and emojis.",
@@ -156,11 +163,11 @@
       "badge_en": "STREAMING",
       "category": "studio",
       "is_hero": false,
-      "is_disabled": false,
+      "is_disabled": true,
       "visible": true
     },
     "audiolab": {
-      "name_es": "AudioLab",
+      "name_es": "Laboratorio de Audio",
       "name_en": "AudioLab",
       "description_es": "Laboratorio de síntesis matemática, fórmulas Bytebeat y efectos procedurales SFX.",
       "description_en": "Mathematical sound synthesis studio, Bytebeat formulas and procedural SFX.",
@@ -176,7 +183,7 @@
       "visible": true
     },
     "musical_trainer": {
-      "name_es": "MusicalTrainer",
+      "name_es": "Entrenador Musical",
       "name_en": "MusicalTrainer",
       "description_es": "Conservatorio interactivo de lectura de partituras en 4 claves, armaduras, intervalos, acordes, diapasón y oído musical.",
       "description_en": "Interactive music conservatory for sight-reading across 4 clefs, key signatures, intervals, chords, fretboard and ear training.",
@@ -187,7 +194,7 @@
       "badge_es": "CONSERVATORIO",
       "badge_en": "CONSERVATORY",
       "category": "studio",
-      "is_hero": false,
+      "is_hero": true,
       "is_disabled": false,
       "visible": true
     },
@@ -204,8 +211,8 @@
       "badge_en": "FINANCE",
       "category": "admin",
       "is_hero": false,
-      "is_disabled": false,
-      "visible": false
+      "is_disabled": true,
+      "visible": true
     },
     "chile_planos": {
       "name_es": "ChilePlanos",
@@ -220,8 +227,8 @@
       "badge_en": "BLUEPRINTS",
       "category": "admin",
       "is_hero": false,
-      "is_disabled": false,
-      "visible": false
+      "is_disabled": true,
+      "visible": true
     },
     "blueguard": {
       "name_es": "BlueGuard",
@@ -234,14 +241,14 @@
       "icon": "blueguard.png",
       "badge_es": "SEGURIDAD",
       "badge_en": "SECURITY",
-      "category": "admin",
+      "category": "security",
       "is_hero": false,
-      "is_disabled": false,
-      "visible": false
+      "is_disabled": true,
+      "visible": true
     },
     "pokebinder": {
-      "name_es": "PokeBinder Inventory",
-      "name_en": "PokeBinder Inventory",
+      "name_es": "PokeBinder",
+      "name_en": "PokeBinder",
       "description_es": "Organizador visual de carpetas Pokémon TCG, cotización de cartas, mazos e inventario.",
       "description_en": "Visual Pokémon TCG binder organizer, card pricing, decks and inventory tracker.",
       "repo": "Media-Hub-Site/PokeBinderInventory",
@@ -251,7 +258,7 @@
       "badge_es": "TCG BINDER",
       "badge_en": "TCG BINDER",
       "category": "admin",
-      "is_hero": false,
+      "is_hero": true,
       "is_disabled": false,
       "visible": true,
       "extra_assets": [
@@ -264,6 +271,38 @@
           "description_en": "TCG card images"
         }
       ]
+    },
+    "rpg_terminal": {
+      "name_es": "RPG Terminal",
+      "name_en": "RPG Terminal",
+      "description_es": "Juego RPG jugable desde la Terminal CMD",
+      "description_en": "RPG game playable to CMD",
+      "badge_es": "NUEVO",
+      "badge_en": "NEW",
+      "category": "games",
+      "repo": "Media-Hub-Site/RPGTerminal",
+      "exe": "RPGTerminal",
+      "dir": "MediaHub-RPGTerminal",
+      "icon": "rpgterminal.png",
+      "visible": true,
+      "is_disabled": true,
+      "is_hero": false
+    },
+    "musical_midi": {
+      "name_es": "MusicalMIDI",
+      "name_en": "MusicalMIDI",
+      "description_es": "Herramienta MIDI para comunicar el Piano al PC",
+      "description_en": "MIDI tool for communicating between the piano and the PC",
+      "badge_es": "NUEVO",
+      "badge_en": "NEW",
+      "category": "studio",
+      "repo": "Media-Hub-Site/MusicalMIDI",
+      "exe": "MusicalMIDI",
+      "dir": "MediaHub-MusicalMIDI",
+      "icon": "musicalmidi.png",
+      "visible": true,
+      "is_disabled": true,
+      "is_hero": false
     }
   }
 }
