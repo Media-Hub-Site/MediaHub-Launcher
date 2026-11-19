@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T04:14:14.517Z",
+  "updated_at": "2026-11-19T04:14:50.663Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -128,7 +128,7 @@
       "visible": true
     },
     "font_family": {
-      "name_es": "FontFamily Atelier",
+      "name_es": "Taller de Fuentes",
       "name_en": "FontFamily Atelier",
       "description_es": "Estudio editorial de fuentes Unicode, caracteres invisibles, símbolos raros, marcos y emojis.",
       "description_en": "Editorial Unicode typography studio, invisible characters, rare symbols, frames and emojis.",
