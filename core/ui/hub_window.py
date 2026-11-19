@@ -22,9 +22,10 @@ from PyQt6.QtCore import QMimeData, Qt, QSize, QThread, pyqtSignal
 from core.theme_manager import ThemeManager
 from core.updater import CheckUpdateThread, UpdateDialog
 from core.config import (
-    APP_REGISTRY, SECTION_CATEGORIES,
+    APP_REGISTRY, SECTION_CATEGORIES, ADMIN_PANEL_URL,
     get_launcher_version, save_launcher_version,
-    get_app_metadata, get_section_metadata
+    get_app_metadata, get_section_metadata,
+    get_cached_icons_dir, sync_remote_catalog
 )
 from core.i18n import t, get_current_language, save_current_language, save_app_language, get_app_language
 from core.sound_manager import SoundManager
@@ -35,12 +36,23 @@ from core.sound_manager import SoundManager
 # ─────────────────────────────────────────────────────────────────────────────
 
 def get_asset_path(filename):
-    """Devuelve la ruta absoluta de un asset del Launcher."""
+    """
+    Devuelve la ruta absoluta de un asset del Launcher.
+    Si es una app nueva agregada dinámicamente desde el catálogo web,
+    busca también en la caché local `~/.mediahub/cache/icons/` y usa Media-Hub.ico como respaldo.
+    """
     if getattr(sys, 'frozen', False):
         base_dir = sys._MEIPASS
     else:
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    return os.path.join(base_dir, "assets", "hub", filename)
+    bundled = os.path.join(base_dir, "assets", "hub", filename)
+    if os.path.isfile(bundled):
+        return bundled
+    cached = os.path.join(get_cached_icons_dir(), os.path.basename(filename))
+    if os.path.isfile(cached):
+        return cached
+    fallback = os.path.join(base_dir, "assets", "hub", "Media-Hub.ico")
+    return fallback if os.path.isfile(fallback) else bundled
 
 
 def get_hub_data_dir() -> str:
@@ -264,6 +276,18 @@ def launch_app(app_id: str):
 # ─────────────────────────────────────────────────────────────────────────────
 #  Thread verificador de actualizaciones de micro-apps
 # ─────────────────────────────────────────────────────────────────────────────
+
+class SyncCatalogThread(QThread):
+    """Sincroniza en segundo plano el catálogo dinámico (catalog.json) desde GitHub."""
+    catalog_synced = pyqtSignal(bool, int)  # (changed, total_visible_apps)
+
+    def run(self):
+        try:
+            changed, total = sync_remote_catalog(timeout=5.0)
+            self.catalog_synced.emit(changed, total)
+        except Exception:
+            self.catalog_synced.emit(False, len(APP_REGISTRY))
+
 
 class CheckMicroAppUpdatesThread(QThread):
     """Verifica en segundo plano si alguna app instalada tiene una versión más nueva en GitHub."""
@@ -778,6 +802,10 @@ class HubWindow(QMainWindow):
         self.init_ui()
         self._apply_theme()
 
+        # 0. Sincronización dinámica del Catálogo Remoto (catalog.json)
+        self.catalog_sync_thread = None
+        self._trigger_catalog_sync(manual=False)
+
         # 1. Actualizaciones Launcher
         self.update_thread = CheckUpdateThread(self)
         self.update_thread.update_available.connect(self.show_update_dialog)
@@ -793,6 +821,36 @@ class HubWindow(QMainWindow):
         self.sizes_thread = FetchAppSizesThread(self)
         self.sizes_thread.sizes_fetched.connect(self._on_app_sizes_fetched)
         self.sizes_thread.start()
+
+    def _trigger_catalog_sync(self, manual: bool = False):
+        if self.catalog_sync_thread and self.catalog_sync_thread.isRunning():
+            return
+        if manual:
+            SoundManager.instance().play("click")
+            if hasattr(self, "sync_btn"):
+                self.sync_btn.setEnabled(False)
+                self.sync_btn.setText(t("btn_syncing"))
+        self.catalog_sync_thread = SyncCatalogThread(self)
+        self.catalog_sync_thread.catalog_synced.connect(
+            lambda changed, total: self._on_catalog_synced(changed, total, manual)
+        )
+        self.catalog_sync_thread.start()
+
+    def _on_catalog_synced(self, changed: bool, total: int, manual: bool = False):
+        if hasattr(self, "sync_btn"):
+            self.sync_btn.setEnabled(True)
+            self.sync_btn.setText(t("btn_sync_catalog"))
+        if changed or manual:
+            self.rebuild_catalog_ui()
+            # Re-consultar tamaños y actualizaciones si entraron apps nuevas y no hay hilo en curso
+            if not getattr(self, "sizes_thread", None) or not self.sizes_thread.isRunning():
+                self.sizes_thread = FetchAppSizesThread(self)
+                self.sizes_thread.sizes_fetched.connect(self._on_app_sizes_fetched)
+                self.sizes_thread.start()
+            if not getattr(self, "micro_apps_updater", None) or not self.micro_apps_updater.isRunning():
+                self.micro_apps_updater = CheckMicroAppUpdatesThread(self)
+                self.micro_apps_updater.update_found.connect(self._on_micro_app_update_found)
+                self.micro_apps_updater.start()
 
     def show_update_dialog(self, version, description, download_url, size_mb):
         dialog = UpdateDialog(version, description, download_url, size_mb, self)
@@ -849,6 +907,12 @@ class HubWindow(QMainWindow):
         self.search_input.setFixedHeight(34)
         self.search_input.textChanged.connect(self._filter_cards)
         header_layout.addWidget(self.search_input)
+
+        self.sync_btn = QPushButton()
+        self.sync_btn.setObjectName("hubSyncBtn")
+        self.sync_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sync_btn.clicked.connect(lambda: self._trigger_catalog_sync(manual=True))
+        header_layout.addWidget(self.sync_btn)
 
         self.sound_btn = QPushButton()
         self.sound_btn.setObjectName("hubSoundBtn")
@@ -928,6 +992,61 @@ class HubWindow(QMainWindow):
 
         self._card_dict: dict[str, AppCard] = {}
         self._section_blocks: dict[str, dict] = {}
+        self._populate_sections_content()
+
+        self.scroll_area.setWidget(self.scroll_content)
+        body_layout.addWidget(self.scroll_area, 1)
+        main_layout.addLayout(body_layout, 1)
+
+        # Footer Dock Bento
+        self.footer_dock = QFrame()
+        self.footer_dock.setObjectName("footerDock")
+        dock_layout = QHBoxLayout(self.footer_dock)
+        dock_layout.setContentsMargins(16, 8, 16, 8)
+
+        self.dock_status_label = QLabel("● Todas las aplicaciones están gestionadas de forma aislada")
+        self.dock_status_label.setObjectName("dockText")
+        dock_layout.addWidget(self.dock_status_label)
+        dock_layout.addStretch()
+
+        self.admin_panel_btn = QPushButton(t("dock_admin_panel"))
+        self.admin_panel_btn.setObjectName("dockLink")
+        self.admin_panel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.admin_panel_btn.setToolTip(t("dock_admin_panel_tooltip"))
+        self.admin_panel_btn.clicked.connect(self._open_admin_panel)
+        dock_layout.addWidget(self.admin_panel_btn)
+
+        self.feedback_btn = QPushButton(t("dock_feedback"))
+        self.feedback_btn.setObjectName("dockLink")
+        self.feedback_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.feedback_btn.setToolTip("Danos tu opinión o reporta errores para seguir mejorando Media Hub")
+        self.feedback_btn.clicked.connect(self._open_feedback_form)
+        dock_layout.addWidget(self.feedback_btn)
+
+        self.dock_folder_btn = QPushButton(t("dock_folder"))
+        self.dock_folder_btn.setObjectName("dockLink")
+        self.dock_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.dock_folder_btn.clicked.connect(self._open_apps_folder)
+        dock_layout.addWidget(self.dock_folder_btn)
+
+        main_layout.addWidget(self.footer_dock)
+        self._update_dock_status()
+        self._refresh_sections_visibility()
+
+    def _populate_sections_content(self):
+        """Construye dinámicamente los bloques de secciones y tarjetas desde APP_REGISTRY."""
+        while self.sections_layout.count():
+            item = self.sections_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.hide()
+                w.setParent(None)
+                w.deleteLater()
+
+        self._card_dict.clear()
+        self._section_blocks.clear()
+        self.lbl_games_empty_title = None
+        self.lbl_games_empty_desc = None
 
         curr_lang = get_current_language()
         content_sections = ["tools", "studio", "admin", "games"]
@@ -939,7 +1058,6 @@ class HubWindow(QMainWindow):
             sec_vbox.setContentsMargins(0, 0, 0, 0)
             sec_vbox.setSpacing(10)
 
-            # Cabecera de la sección con línea divisora (Herramientas ──────)
             hdr_top = QHBoxLayout()
             hdr_top.setSpacing(10)
             lbl_sec_title = QLabel(f"{sec_meta['icon']}  {sec_meta['name']}")
@@ -974,9 +1092,11 @@ class HubWindow(QMainWindow):
                 (1, 1), (1, 2),
                 (2, 0), (2, 1), (2, 2),
                 (3, 0), (3, 1), (3, 2),
+                (4, 0), (4, 1), (4, 2),
+                (5, 0), (5, 1), (5, 2),
             ]
             normal_slots = [
-                (r, c) for r in range(6) for c in range(3)
+                (r, c) for r in range(10) for c in range(3)
             ]
             slot_idx = 0
 
@@ -1005,7 +1125,6 @@ class HubWindow(QMainWindow):
                         sec_grid.addWidget(card, r, c)
                         slot_idx += 1
 
-            # Si es la sección de Juegos y aún no hay juegos registrados, mostrar tarjeta Arcade
             empty_placeholder = None
             if sec_id == "games" and not sec_apps:
                 empty_placeholder = QFrame()
@@ -1033,7 +1152,6 @@ class HubWindow(QMainWindow):
                 "empty_placeholder": empty_placeholder,
             }
 
-        # Banner para cuando se filtra por "Instaladas" y aún no hay ninguna instalada
         self.installed_empty_card = QFrame()
         self.installed_empty_card.setObjectName("appCardDisabled")
         ie_lay = QVBoxLayout(self.installed_empty_card)
@@ -1046,39 +1164,19 @@ class HubWindow(QMainWindow):
         ie_lay.addWidget(self.lbl_inst_empty_desc)
         self.installed_empty_card.hide()
         self.sections_layout.addWidget(self.installed_empty_card)
-
         self.sections_layout.addStretch()
-        self.scroll_area.setWidget(self.scroll_content)
-        body_layout.addWidget(self.scroll_area, 1)
-        main_layout.addLayout(body_layout, 1)
 
-        # Footer Dock Bento
-        self.footer_dock = QFrame()
-        self.footer_dock.setObjectName("footerDock")
-        dock_layout = QHBoxLayout(self.footer_dock)
-        dock_layout.setContentsMargins(16, 8, 16, 8)
+    def rebuild_catalog_ui(self):
+        """Reconstruye en caliente las tarjetas y secciones tras sincronizar catalog.json."""
+        self._populate_sections_content()
+        self._apply_theme()
 
-        self.dock_status_label = QLabel("● Todas las aplicaciones están gestionadas de forma aislada")
-        self.dock_status_label.setObjectName("dockText")
-        dock_layout.addWidget(self.dock_status_label)
-        dock_layout.addStretch()
-
-        self.feedback_btn = QPushButton(t("dock_feedback"))
-        self.feedback_btn.setObjectName("dockLink")
-        self.feedback_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.feedback_btn.setToolTip("Danos tu opinión o reporta errores para seguir mejorando Media Hub")
-        self.feedback_btn.clicked.connect(self._open_feedback_form)
-        dock_layout.addWidget(self.feedback_btn)
-
-        self.dock_folder_btn = QPushButton(t("dock_folder"))
-        self.dock_folder_btn.setObjectName("dockLink")
-        self.dock_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.dock_folder_btn.clicked.connect(self._open_apps_folder)
-        dock_layout.addWidget(self.dock_folder_btn)
-
-        main_layout.addWidget(self.footer_dock)
-        self._update_dock_status()
-        self._refresh_sections_visibility()
+    def _open_admin_panel(self):
+        SoundManager.instance().play("click")
+        try:
+            webbrowser.open(ADMIN_PANEL_URL)
+        except Exception:
+            pass
 
     def _select_section(self, section_id: str):
         SoundManager.instance().play("click")
@@ -1452,6 +1550,11 @@ class HubWindow(QMainWindow):
         self.search_input.setPlaceholderText(t("search_placeholder"))
         self.search_input.setStyleSheet(styles.get("search_input", ""))
 
+        # Botón de sincronización de catálogo
+        self.sync_btn.setStyleSheet(styles["toggle_btn"])
+        self.sync_btn.setText(t("btn_sync_catalog"))
+        self.sync_btn.setToolTip(t("btn_sync_catalog_tooltip"))
+
         # Botón de sonido
         sound_enabled = SoundManager.instance().is_enabled()
         self.sound_btn.setStyleSheet(styles["toggle_btn"])
@@ -1470,6 +1573,8 @@ class HubWindow(QMainWindow):
         self.scroll_area.setStyleSheet(styles.get("scroll_area", ""))
         self.footer_dock.setStyleSheet(styles["dock"])
 
+        self.admin_panel_btn.setText(t("dock_admin_panel"))
+        self.admin_panel_btn.setToolTip(t("dock_admin_panel_tooltip"))
         self.feedback_btn.setText(t("dock_feedback"))
         self.feedback_btn.setToolTip(t("dock_feedback_tooltip"))
         self.dock_folder_btn.setText(t("dock_folder"))
@@ -1492,7 +1597,7 @@ class HubWindow(QMainWindow):
             if block.get("empty_placeholder") is not None:
                 block["empty_placeholder"].setStyleSheet(styles["card_disabled"])
 
-        if hasattr(self, "lbl_games_empty_title"):
+        if getattr(self, "lbl_games_empty_title", None) is not None:
             self.lbl_games_empty_title.setText(t("games_empty_title"))
             self.lbl_games_empty_title.setStyleSheet(styles["card_title"])
             self.lbl_games_empty_desc.setText(t("games_empty_desc"))

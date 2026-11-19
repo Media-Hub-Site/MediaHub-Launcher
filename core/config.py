@@ -1,24 +1,48 @@
 """
 core/config.py
 ──────────────
-Configuración global del Launcher, categorías de secciones y registro de micro-aplicaciones.
-La versión del launcher se resuelve dinámicamente con get_launcher_version().
+Configuración global del Launcher, categorías de secciones y catálogo dinámico de micro-aplicaciones.
+Soporta sincronización en vivo con `catalog.json` remoto en GitHub (gestionable desde el Panel Web
+en GitHub Pages), caché local offline en `~/.mediahub/catalog_cache.json` y descarga dinámica de iconos.
 """
 
 import os
 import json
 import sys
+import time
+import hashlib
+import requests
 
 GITHUB_REPO = "Media-Hub-Site/MediaHub-Launcher"
 ORG_NAME = "Media-Hub-Site"
 
+CATALOG_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/contents/catalog.json?ref=main"
+CATALOG_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/catalog.json"
+ADMIN_PANEL_URL = f"https://media-hub-site.github.io/MediaHub-Launcher/"
+
 # Fallback si aún no existe archivo de versión local ni conexión
-DEFAULT_LAUNCHER_VERSION = "v1.5.0"
+DEFAULT_LAUNCHER_VERSION = "v1.6.0"
+
+
+def get_base_dir() -> str:
+    if getattr(sys, "frozen", False):
+        return getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def get_launcher_data_dir() -> str:
     home = os.environ.get("USERPROFILE") or os.path.expanduser("~")
     path = os.path.join(home, ".mediahub")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def get_cached_catalog_file() -> str:
+    return os.path.join(get_launcher_data_dir(), "catalog_cache.json")
+
+
+def get_cached_icons_dir() -> str:
+    path = os.path.join(get_launcher_data_dir(), "cache", "icons")
     os.makedirs(path, exist_ok=True)
     return path
 
@@ -33,14 +57,9 @@ def get_launcher_version() -> str:
     Prioridad:
     1. Archivo local de instalación empaquetado (version.json junto al exe o root).
     2. Archivo persistido de usuario (~/.mediahub/launcher_version.json).
-    3. DEFAULT_LAUNCHER_VERSION (ej. v1.4.0).
+    3. DEFAULT_LAUNCHER_VERSION (ej. v1.6.0).
     """
-    if getattr(sys, 'frozen', False):
-        base_dir = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
-    else:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-    bundled_file = os.path.join(base_dir, "version.json")
+    bundled_file = os.path.join(get_base_dir(), "version.json")
     if os.path.isfile(bundled_file):
         try:
             with open(bundled_file, "r", encoding="utf-8") as f:
@@ -79,7 +98,7 @@ def save_launcher_version(version: str):
 # Constante compatible hacia atrás
 APP_VERSION = get_launcher_version()
 
-# Definición de Secciones / Categorías del Sidebar (Issue #53)
+# Definición base de Secciones / Categorías del Sidebar (Issue #53)
 SECTION_CATEGORIES = {
     "all": {
         "icon": "✦",
@@ -106,8 +125,8 @@ SECTION_CATEGORIES = {
         "icon": "📊",
         "name_es": "Administración",
         "name_en": "Management",
-        "desc_es": "Finanzas personales, planimetría técnica para construcción y defensa de ciberseguridad.",
-        "desc_en": "Personal finance, technical architectural blueprints and Blue Team cybersecurity.",
+        "desc_es": "Finanzas personales, planimetría técnica para construcción, inventario y defensa de ciberseguridad.",
+        "desc_en": "Personal finance, technical architectural blueprints, inventory and Blue Team cybersecurity.",
     },
     "games": {
         "icon": "🎮",
@@ -125,8 +144,8 @@ SECTION_CATEGORIES = {
     },
 }
 
-# Registro de micro-apps con soporte bilingüe (Español / English) y categoría de sección
-APP_REGISTRY = {
+# Respaldo local (Offline Fallback) si aún no hay catalog.json ni conexión
+DEFAULT_APP_REGISTRY = {
     "media": {
         "name_es":        "Convertidor Multimedia",
         "name_en":        "Multimedia Converter",
@@ -356,6 +375,209 @@ APP_REGISTRY = {
     },
 }
 
+# Diccionario vivo de aplicaciones activas (se muta in-place al sincronizar catalog.json)
+APP_REGISTRY: dict[str, dict] = dict(DEFAULT_APP_REGISTRY)
+
+
+def _normalize_app_entry(app_id: str, raw: dict) -> dict:
+    """Garantiza que una entrada del catálogo JSON tenga todas las claves esperadas por el Launcher."""
+    entry = dict(raw)
+    name_es = entry.get("name_es") or entry.get("name") or app_id
+    name_en = entry.get("name_en") or name_es
+    desc_es = entry.get("description_es") or entry.get("description") or ""
+    desc_en = entry.get("description_en") or desc_es
+    badge_es = entry.get("badge_es") or entry.get("badge") or ""
+    badge_en = entry.get("badge_en") or badge_es
+
+    repo = entry.get("repo", f"{ORG_NAME}/{app_id}")
+    if "/" not in repo:
+        repo = f"{ORG_NAME}/{repo}"
+
+    repo_short = repo.split("/")[-1]
+    entry["name_es"] = name_es
+    entry["name_en"] = name_en
+    entry["name"] = name_es
+    entry["description_es"] = desc_es
+    entry["description_en"] = desc_en
+    entry["description"] = desc_es
+    entry["badge_es"] = badge_es
+    entry["badge_en"] = badge_en
+    entry["badge"] = badge_es
+    entry["repo"] = repo
+    entry["exe"] = entry.get("exe") or f"{repo_short}.exe"
+    entry["dir"] = entry.get("dir") or f"MediaHub-{repo_short}"
+    entry["icon"] = entry.get("icon") or f"{repo_short.lower()}.png"
+    entry["category"] = entry.get("category") or "tools"
+    entry["is_hero"] = bool(entry.get("is_hero", False))
+    entry["is_disabled"] = bool(entry.get("is_disabled", False))
+    return entry
+
+
+def _catalog_fingerprint() -> str:
+    """Devuelve un hash rápido del estado actual de APP_REGISTRY y SECTION_CATEGORIES."""
+    payload = json.dumps(
+        {"apps": APP_REGISTRY, "sections": SECTION_CATEGORIES},
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+    return hashlib.md5(payload.encode("utf-8")).hexdigest()
+
+
+def apply_catalog_dict(catalog_data: dict) -> bool:
+    """
+    Aplica un diccionario de catálogo (`catalog.json`) mutando `APP_REGISTRY` y
+    `SECTION_CATEGORIES` in-place. Filtra las aplicaciones con `visible: false`.
+    Devuelve True si hubo algún cambio respecto al estado anterior.
+    """
+    if not isinstance(catalog_data, dict):
+        return False
+
+    raw_apps = catalog_data.get("apps")
+    if not isinstance(raw_apps, dict):
+        return False
+
+    before_fp = _catalog_fingerprint()
+
+    raw_sections = catalog_data.get("sections")
+    if isinstance(raw_sections, dict) and raw_sections:
+        for sec_id, sec_meta in raw_sections.items():
+            if isinstance(sec_meta, dict):
+                SECTION_CATEGORIES[sec_id] = dict(sec_meta)
+
+    visible_apps: dict[str, dict] = {}
+    for app_id, app_meta in raw_apps.items():
+        if not isinstance(app_meta, dict):
+            continue
+        if app_meta.get("visible", True) is False:
+            continue
+        visible_apps[app_id] = _normalize_app_entry(app_id, app_meta)
+
+    APP_REGISTRY.clear()
+    APP_REGISTRY.update(visible_apps)
+
+    after_fp = _catalog_fingerprint()
+    return before_fp != after_fp
+
+
+def load_initial_catalog() -> None:
+    """
+    Carga el catálogo inicial al arrancar el Launcher:
+    1. Lee `catalog.json` empaquetado con la aplicación.
+    2. Si existe `~/.mediahub/catalog_cache.json` (última sincronización remota), lo aplica encima.
+    """
+    bundled_catalog = os.path.join(get_base_dir(), "catalog.json")
+    if os.path.isfile(bundled_catalog):
+        try:
+            with open(bundled_catalog, "r", encoding="utf-8") as f:
+                apply_catalog_dict(json.load(f))
+        except Exception:
+            pass
+
+    cached_catalog = get_cached_catalog_file()
+    if os.path.isfile(cached_catalog):
+        try:
+            with open(cached_catalog, "r", encoding="utf-8") as f:
+                apply_catalog_dict(json.load(f))
+        except Exception:
+            pass
+
+
+def ensure_app_icon_cached(app_id: str, app_meta: dict) -> None:
+    """
+    Si el icono de una aplicación nueva no está empaquetado localmente en `assets/hub/`,
+    lo descarga automáticamente desde `icon_url` o desde el repositorio de la app en GitHub
+    y lo guarda en `~/.mediahub/cache/icons/`.
+    """
+    icon_name = app_meta.get("icon", "")
+    if not icon_name:
+        return
+
+    bundled_icon = os.path.join(get_base_dir(), "assets", "hub", icon_name)
+    if os.path.isfile(bundled_icon):
+        return
+
+    cached_icon = os.path.join(get_cached_icons_dir(), icon_name)
+    if os.path.isfile(cached_icon) and os.path.getsize(cached_icon) > 100:
+        return
+
+    repo = app_meta.get("repo", "")
+    candidate_urls = []
+    if app_meta.get("icon_url"):
+        candidate_urls.append(app_meta["icon_url"])
+    if repo:
+        candidate_urls.append(f"https://raw.githubusercontent.com/{repo}/main/assets/hub/{icon_name}")
+        candidate_urls.append(f"https://raw.githubusercontent.com/{repo}/master/assets/hub/{icon_name}")
+    candidate_urls.append(f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/assets/hub/{icon_name}")
+
+    for url in candidate_urls:
+        try:
+            resp = requests.get(url, timeout=4)
+            if resp.status_code == 200 and len(resp.content) > 100:
+                with open(cached_icon, "wb") as f:
+                    f.write(resp.content)
+                return
+        except Exception:
+            continue
+
+
+def sync_remote_catalog(timeout: float = 5.0) -> tuple[bool, int]:
+    """
+    Descarga la versión más reciente de `catalog.json` desde GitHub:
+    1. Primero consulta la API Contents de GitHub (`Accept: application/vnd.github.raw+json`)
+       para obtener cambios al instante sin esperar la caché CDN de 5 minutos.
+    2. Si se supera el rate limit, usa `raw.githubusercontent.com` con cache-buster.
+    Actualiza `APP_REGISTRY` in-place, descarga iconos nuevos si faltan y persiste
+    en `~/.mediahub/catalog_cache.json`.
+    Devuelve `(hubo_cambios, total_apps_visibles)`.
+    """
+    headers_api = {
+        "User-Agent": "MediaHub-Launcher",
+        "Accept": "application/vnd.github.raw+json",
+        "Cache-Control": "no-cache",
+    }
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        headers_api["Authorization"] = f"Bearer {token}"
+
+    catalog_data = None
+    try:
+        resp = requests.get(CATALOG_API_URL, headers=headers_api, timeout=timeout)
+        if resp.status_code == 200:
+            catalog_data = resp.json()
+    except Exception:
+        catalog_data = None
+
+    if not isinstance(catalog_data, dict) or "apps" not in catalog_data:
+        try:
+            bust_url = f"{CATALOG_RAW_URL}?t={int(time.time())}"
+            resp = requests.get(
+                bust_url,
+                headers={"User-Agent": "MediaHub-Launcher", "Cache-Control": "no-cache"},
+                timeout=timeout,
+            )
+            if resp.status_code == 200:
+                catalog_data = resp.json()
+        except Exception:
+            catalog_data = None
+
+    if not isinstance(catalog_data, dict) or "apps" not in catalog_data:
+        return False, len(APP_REGISTRY)
+
+    # Persistir en caché local para inicios futuros offline
+    try:
+        with open(get_cached_catalog_file(), "w", encoding="utf-8") as f:
+            json.dump(catalog_data, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"Error guardando caché del catálogo: {e}")
+
+    changed = apply_catalog_dict(catalog_data)
+
+    # Descargar iconos faltantes para apps nuevas
+    for aid, ameta in list(APP_REGISTRY.items()):
+        ensure_app_icon_cached(aid, ameta)
+
+    return changed, len(APP_REGISTRY)
+
 
 def get_app_metadata(app_id: str, lang: str = "es") -> dict:
     """Devuelve los metadatos de una aplicación traducidos al idioma solicitado."""
@@ -378,3 +600,7 @@ def get_section_metadata(section_id: str, lang: str = "es") -> dict:
         "name": sec.get(f"name_{lang}", sec.get("name_es", section_id)),
         "description": sec.get(f"desc_{lang}", sec.get("desc_es", "")),
     }
+
+
+# Inicializar catálogo al importar el módulo
+load_initial_catalog()
