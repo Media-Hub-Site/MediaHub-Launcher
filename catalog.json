@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T03:12:59.725Z",
+  "updated_at": "2026-11-19T03:13:51.508Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -276,7 +276,7 @@
       "repo": "Media-Hub-Site/RPGTerminal",
       "exe": "RPGTerminal",
       "dir": "MediaHub-RPGTerminal",
-      "icon": "media.png",
+      "icon": "rpgterminal.png",
       "visible": true,
       "is_disabled": true,
       "is_hero": false
