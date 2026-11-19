@@ -994,14 +994,48 @@
       showToast(`🗑️ Categoría "${sid}" eliminada.`);
     }
 
+    function moveCategory(sid, direction) {
+      if (!catalog.sections || !catalog.sections[sid]) return;
+      const keys = Object.keys(catalog.sections);
+      const reorderable = keys.filter(k => k !== "all" && k !== "installed");
+      const idx = reorderable.indexOf(sid);
+      if (idx === -1) return;
+
+      const targetIdx = idx + direction;
+      if (targetIdx < 0 || targetIdx >= reorderable.length) return;
+
+      const swapKey = reorderable[targetIdx];
+      reorderable[idx] = swapKey;
+      reorderable[targetIdx] = sid;
+
+      // Reconstruir catalog.sections con el nuevo orden de inserción de claves
+      const newSections = {};
+      if (catalog.sections["all"]) newSections["all"] = catalog.sections["all"];
+      for (const k of reorderable) {
+        newSections[k] = catalog.sections[k];
+      }
+      if (catalog.sections["installed"]) newSections["installed"] = catalog.sections["installed"];
+
+      catalog.sections = newSections;
+      renderCategoriesList();
+      syncCategoryDropdowns();
+      markChanged();
+      showToast(`↕️ Categoría "${catalog.sections[sid].name_es || sid}" movida.`);
+    }
+
     function renderCategoriesList() {
       const container = document.getElementById("categoriesList");
       container.innerHTML = "";
       const sec = catalog.sections || {};
+      const reorderable = Object.keys(sec).filter(k => k !== "all" && k !== "installed");
 
-      for (const [sid, smeta] of Object.entries(sec)) {
-        if (sid === "all" || sid === "installed") continue;
+      for (let i = 0; i < reorderable.length; i++) {
+        const sid = reorderable[i];
+        const smeta = sec[sid];
         const count = Object.values(catalog.apps || {}).filter(a => a.category === sid).length;
+
+        const isFirst = (i === 0);
+        const isLast = (i === reorderable.length - 1);
 
         const row = document.createElement("div");
         row.style.display = "flex";
@@ -1014,11 +1048,17 @@
         row.style.gap = "10px";
 
         row.innerHTML = `
-          <div>
-            <span style="font-size:1.1rem; margin-right:6px;">${smeta.icon || "📁"}</span>
-            <strong>${smeta.name_es || sid}</strong>
-            <code style="margin-left:6px; font-size:0.75rem; color:var(--text-secondary);">${sid}</code>
-            <span class="badge badge-blue" style="margin-left:8px;">${count} apps</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <button class="btn" style="padding:1px 5px; font-size:0.65rem; line-height:1;" ${isFirst ? "disabled style='opacity:0.3; cursor:default;'" : ""} onclick="moveCategory('${sid}', -1)" title="Subir posición">▲</button>
+              <button class="btn" style="padding:1px 5px; font-size:0.65rem; line-height:1;" ${isLast ? "disabled style='opacity:0.3; cursor:default;'" : ""} onclick="moveCategory('${sid}', 1)" title="Bajar posición">▼</button>
+            </div>
+            <div>
+              <span style="font-size:1.1rem; margin-right:6px;">${smeta.icon || "📁"}</span>
+              <strong>${smeta.name_es || sid}</strong>
+              <code style="margin-left:6px; font-size:0.75rem; color:var(--text-secondary);">${sid}</code>
+              <span class="badge badge-blue" style="margin-left:8px;">${count} apps</span>
+            </div>
           </div>
           <div style="display:flex; gap:6px;">
             <button class="btn" style="padding:4px 8px; font-size:0.78rem;" onclick="editCategory('${sid}')">✏️ Editar</button>

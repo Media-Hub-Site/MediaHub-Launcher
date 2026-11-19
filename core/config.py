@@ -23,7 +23,7 @@ CATALOG_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/catalog
 ADMIN_PANEL_URL = f"https://media-hub-site.github.io/MediaHub-Launcher/"
 
 # Fallback si aún no existe archivo de versión local ni conexión
-DEFAULT_LAUNCHER_VERSION = "v1.6.1"
+DEFAULT_LAUNCHER_VERSION = "v1.7.0"
 
 
 def get_base_dir() -> str:
@@ -442,6 +442,7 @@ def apply_catalog_dict(catalog_data: dict) -> bool:
 
     raw_sections = catalog_data.get("sections")
     if isinstance(raw_sections, dict) and raw_sections:
+        SECTION_CATEGORIES.clear()
         for sec_id, sec_meta in raw_sections.items():
             if isinstance(sec_meta, dict):
                 SECTION_CATEGORIES[sec_id] = dict(sec_meta)
