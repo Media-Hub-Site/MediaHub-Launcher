@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T04:15:23.366Z",
+  "updated_at": "2026-11-19T04:15:35.997Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -220,7 +220,7 @@
       "badge_en": "BLUEPRINTS",
       "category": "admin",
       "is_hero": false,
-      "is_disabled": false,
+      "is_disabled": true,
       "visible": true
     },
     "blueguard": {
