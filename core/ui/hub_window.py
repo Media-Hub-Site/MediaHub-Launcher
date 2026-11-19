@@ -1,6 +1,7 @@
 import webbrowser
 import os
 import sys
+import copy
 import json
 import re
 import subprocess
@@ -17,7 +18,7 @@ from PyQt6.QtWidgets import (
     QMenu, QLineEdit, QScrollArea
 )
 from PyQt6.QtGui import QPixmap, QIcon, QColor, QDrag, QAction
-from PyQt6.QtCore import QMimeData, Qt, QSize, QThread, pyqtSignal
+from PyQt6.QtCore import QMimeData, Qt, QSize, QThread, QTimer, pyqtSignal
 
 from core.theme_manager import ThemeManager
 from core.updater import CheckUpdateThread, UpdateDialog
@@ -25,7 +26,8 @@ from core.config import (
     APP_REGISTRY, SECTION_CATEGORIES, ADMIN_PANEL_URL,
     get_launcher_version, save_launcher_version,
     get_app_metadata, get_section_metadata,
-    get_cached_icons_dir, sync_remote_catalog
+    get_cached_icons_dir, apply_catalog_dict,
+    fetch_remote_catalog_payload, sync_remote_catalog
 )
 from core.i18n import t, get_current_language, save_current_language, save_app_language, get_app_language
 from core.sound_manager import SoundManager
@@ -278,87 +280,143 @@ def launch_app(app_id: str):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class SyncCatalogThread(QThread):
-    """Sincroniza en segundo plano el catálogo dinámico (catalog.json) desde GitHub."""
-    catalog_synced = pyqtSignal(bool, int)  # (changed, total_visible_apps)
+    """
+    Descarga en segundo plano el catálogo dinámico (catalog.json) desde GitHub
+    SIN mutar APP_REGISTRY en el hilo secundario (emite el payload al hilo GUI principal).
+    """
+    catalog_payload_ready = pyqtSignal(object, str, bool)  # (catalog_data_or_None, latest_sha, manual)
+
+    def __init__(self, parent=None, known_sha: str = "", manual: bool = False):
+        super().__init__(parent)
+        self.known_sha = known_sha
+        self.manual = manual
 
     def run(self):
         try:
-            changed, total = sync_remote_catalog(timeout=5.0)
-            self.catalog_synced.emit(changed, total)
+            # Si es manual, forzamos descarga ignorando known_sha para verificar cambios inmediatos
+            sha_to_check = "" if self.manual else self.known_sha
+            catalog_data, latest_sha = fetch_remote_catalog_payload(timeout=4.5, known_sha=sha_to_check)
+            self.catalog_payload_ready.emit(catalog_data, latest_sha, self.manual)
         except Exception:
-            self.catalog_synced.emit(False, len(APP_REGISTRY))
+            self.catalog_payload_ready.emit(None, "", self.manual)
 
 
 class CheckMicroAppUpdatesThread(QThread):
     """Verifica en segundo plano si alguna app instalada tiene una versión más nueva en GitHub."""
     update_found = pyqtSignal(str, str)  # (app_id, new_version)
 
+    def __init__(self, parent=None, apps_snapshot: dict | None = None):
+        super().__init__(parent)
+        self.apps_snapshot = copy.deepcopy(apps_snapshot if apps_snapshot is not None else dict(APP_REGISTRY))
+
     def run(self):
-        installed = load_installed_versions()
-        for app_id, cur_v in installed.items():
-            reg = APP_REGISTRY.get(app_id)
-            if not reg:
-                continue
-            try:
-                url = f"https://api.github.com/repos/{reg['repo']}/releases/latest"
-                resp = requests.get(url, timeout=5)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    tag = data.get("tag_name", "").lstrip("v")
+        try:
+            installed = load_installed_versions()
+            headers = {"User-Agent": "MediaHub-Launcher"}
+            for app_id, cur_v in list(installed.items()):
+                reg = self.apps_snapshot.get(app_id)
+                if not reg:
+                    continue
+                repo = reg.get("repo", "")
+                if not repo:
+                    continue
+                try:
+                    tag = ""
+                    # 1. Consultar redirección 302 directa de GitHub (0 consumo de rate-limit API)
+                    rel_url = f"https://github.com/{repo}/releases/latest"
+                    head_res = requests.head(rel_url, headers=headers, allow_redirects=False, timeout=5)
+                    loc = head_res.headers.get("Location", "")
+                    if "/releases/tag/" in loc:
+                        tag = loc.split("/releases/tag/")[-1].split("?")[0].strip().lstrip("v")
+
+                    # 2. Respaldo API REST si no hubo redirección
+                    if not tag:
+                        url = f"https://api.github.com/repos/{repo}/releases/latest"
+                        resp = requests.get(url, headers=headers, timeout=5)
+                        if resp.status_code == 200:
+                            tag = resp.json().get("tag_name", "").lstrip("v")
+
                     if tag and tag != cur_v:
                         cur_parts = [int(x) for x in cur_v.split(".") if x.isdigit()]
                         tag_parts = [int(x) for x in tag.split(".") if x.isdigit()]
                         if tag_parts > cur_parts:
                             self.update_found.emit(app_id, tag)
-            except Exception:
-                pass
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
 
 class FetchAppSizesThread(QThread):
     """Consulta en segundo plano el tamaño de descarga/release de cada app desde GitHub."""
     sizes_fetched = pyqtSignal(dict)  # {app_id: "143 MB"}
 
+    def __init__(self, parent=None, apps_snapshot: dict | None = None, only_missing: bool = False):
+        super().__init__(parent)
+        self.apps_snapshot = copy.deepcopy(apps_snapshot if apps_snapshot is not None else dict(APP_REGISTRY))
+        self.only_missing = only_missing
+
     def run(self):
-        sizes = load_cached_sizes()
-        changed = False
-        for app_id, reg in APP_REGISTRY.items():
-            repo = reg.get("repo")
-            if not repo or reg.get("is_disabled"):
-                continue
-            try:
-                url = f"https://api.github.com/repos/{repo}/releases/latest"
-                resp = requests.get(url, timeout=6)
-                if resp.status_code == 200:
-                    data = resp.json()
+        try:
+            sizes = load_cached_sizes()
+            changed = False
+            headers = {"User-Agent": "MediaHub-Launcher"}
+            token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+
+            for app_id, reg in list(self.apps_snapshot.items()):
+                if self.only_missing and sizes.get(app_id):
+                    continue
+                # Si ya está en caché en disco, no saturar la API de GitHub innecesariamente
+                if sizes.get(app_id):
+                    continue
+
+                repo = reg.get("repo")
+                if not repo or reg.get("is_disabled"):
+                    continue
+                try:
                     total_sz_bytes = 0
-                    for asset in data.get("assets", []):
-                        if asset.get("name", "").endswith((".zip", ".exe")):
-                            total_sz_bytes += asset.get("size", 0)
-                            break
-                    
-                    # Sumar assets adicionales (ej. images.zip en PokeBinder)
-                    for extra in reg.get("extra_assets", []):
-                        extra_name = extra.get("name")
-                        # Primero revisar si ya vino en el release latest
-                        found_in_latest = False
+                    url = f"https://api.github.com/repos/{repo}/releases/latest"
+                    resp = requests.get(url, headers=headers, timeout=6)
+                    if resp.status_code == 200:
+                        data = resp.json()
                         for asset in data.get("assets", []):
-                            if asset.get("name") == extra_name:
+                            if asset.get("name", "").endswith((".zip", ".exe")):
                                 total_sz_bytes += asset.get("size", 0)
-                                found_in_latest = True
                                 break
-                        if not found_in_latest:
-                            tag = extra.get("tag")
-                            if tag:
-                                extra_url = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
-                                try:
-                                    e_resp = requests.get(extra_url, timeout=5)
-                                    if e_resp.status_code == 200:
-                                        for e_asset in e_resp.json().get("assets", []):
-                                            if e_asset.get("name") == extra_name:
-                                                total_sz_bytes += e_asset.get("size", 0)
-                                                break
-                                except Exception:
-                                    pass
+
+                        for extra in reg.get("extra_assets", []):
+                            extra_name = extra.get("name")
+                            found_in_latest = False
+                            for asset in data.get("assets", []):
+                                if asset.get("name") == extra_name:
+                                    total_sz_bytes += asset.get("size", 0)
+                                    found_in_latest = True
+                                    break
+                            if not found_in_latest:
+                                tag = extra.get("tag")
+                                if tag:
+                                    extra_url = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
+                                    try:
+                                        e_resp = requests.get(extra_url, headers=headers, timeout=5)
+                                        if e_resp.status_code == 200:
+                                            for e_asset in e_resp.json().get("assets", []):
+                                                if e_asset.get("name") == extra_name:
+                                                    total_sz_bytes += e_asset.get("size", 0)
+                                                    break
+                                    except Exception:
+                                        pass
+                    else:
+                        # Fallback directo por HEAD sin API de GitHub (0 consumo de rate-limit)
+                        repo_dir = reg.get("dir", "")
+                        if repo_dir:
+                            direct_url = f"https://github.com/{repo}/releases/latest/download/{repo_dir}.zip"
+                            h_res = requests.head(direct_url, headers=headers, allow_redirects=True, timeout=6)
+                            if h_res.status_code == 200:
+                                cl = h_res.headers.get("Content-Length") or h_res.headers.get("content-length")
+                                if cl and str(cl).isdigit():
+                                    total_sz_bytes = int(cl)
 
                     if total_sz_bytes > 0:
                         mb = total_sz_bytes / (1024 * 1024)
@@ -366,11 +424,13 @@ class FetchAppSizesThread(QThread):
                         if sizes.get(app_id) != sz_str:
                             sizes[app_id] = sz_str
                             changed = True
-            except Exception:
-                pass
-        if changed:
-            save_cached_sizes(sizes)
-        self.sizes_fetched.emit(sizes)
+                except Exception:
+                    pass
+            if changed:
+                save_cached_sizes(sizes)
+            self.sizes_fetched.emit(sizes)
+        except Exception:
+            pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -802,9 +862,15 @@ class HubWindow(QMainWindow):
         self.init_ui()
         self._apply_theme()
 
-        # 0. Sincronización dinámica del Catálogo Remoto (catalog.json)
+        # 0. Sincronización dinámica del Catálogo Remoto (catalog.json) + Live Polling
+        self._last_catalog_sha: str = ""
         self.catalog_sync_thread = None
         self._trigger_catalog_sync(manual=False)
+
+        self._catalog_poll_timer = QTimer(self)
+        self._catalog_poll_timer.setInterval(6000)
+        self._catalog_poll_timer.timeout.connect(self._on_auto_catalog_poll)
+        self._catalog_poll_timer.start()
 
         # 1. Actualizaciones Launcher
         self.update_thread = CheckUpdateThread(self)
@@ -813,14 +879,20 @@ class HubWindow(QMainWindow):
         self.update_thread.start()
 
         # 2. Actualizaciones micro-apps
-        self.micro_apps_updater = CheckMicroAppUpdatesThread(self)
+        self.micro_apps_updater = CheckMicroAppUpdatesThread(self, apps_snapshot=dict(APP_REGISTRY))
         self.micro_apps_updater.update_found.connect(self._on_micro_app_update_found)
         self.micro_apps_updater.start()
 
         # 3. Consulta de tamaño de cada aplicación (Issue #4)
-        self.sizes_thread = FetchAppSizesThread(self)
+        self.sizes_thread = FetchAppSizesThread(self, apps_snapshot=dict(APP_REGISTRY), only_missing=True)
         self.sizes_thread.sizes_fetched.connect(self._on_app_sizes_fetched)
         self.sizes_thread.start()
+
+    def _on_auto_catalog_poll(self):
+        """Sincronización silenciosa en tiempo real cada 6s cuando no hay descargas en curso."""
+        if self._workers:
+            return
+        self._trigger_catalog_sync(manual=False)
 
     def _trigger_catalog_sync(self, manual: bool = False):
         if self.catalog_sync_thread and self.catalog_sync_thread.isRunning():
@@ -830,27 +902,40 @@ class HubWindow(QMainWindow):
             if hasattr(self, "sync_btn"):
                 self.sync_btn.setEnabled(False)
                 self.sync_btn.setText(t("btn_syncing"))
-        self.catalog_sync_thread = SyncCatalogThread(self)
-        self.catalog_sync_thread.catalog_synced.connect(
-            lambda changed, total: self._on_catalog_synced(changed, total, manual)
+        self.catalog_sync_thread = SyncCatalogThread(
+            self,
+            known_sha=self._last_catalog_sha,
+            manual=manual,
         )
+        self.catalog_sync_thread.catalog_payload_ready.connect(self._on_catalog_payload_ready)
         self.catalog_sync_thread.start()
 
-    def _on_catalog_synced(self, changed: bool, total: int, manual: bool = False):
+    def _on_catalog_payload_ready(self, catalog_data: object, latest_sha: str, manual: bool = False):
         if hasattr(self, "sync_btn"):
             self.sync_btn.setEnabled(True)
             self.sync_btn.setText(t("btn_sync_catalog"))
-        if changed or manual:
+
+        if latest_sha:
+            self._last_catalog_sha = latest_sha
+
+        changed = False
+        if isinstance(catalog_data, dict):
+            # Mutar APP_REGISTRY exclusivamente en el hilo principal de Qt (thread-safe)
+            changed = apply_catalog_dict(catalog_data)
+
+        if changed and not self._workers:
             self.rebuild_catalog_ui()
-            # Re-consultar tamaños y actualizaciones si entraron apps nuevas y no hay hilo en curso
             if not getattr(self, "sizes_thread", None) or not self.sizes_thread.isRunning():
-                self.sizes_thread = FetchAppSizesThread(self)
+                self.sizes_thread = FetchAppSizesThread(
+                    self,
+                    apps_snapshot=dict(APP_REGISTRY),
+                    only_missing=True,
+                )
                 self.sizes_thread.sizes_fetched.connect(self._on_app_sizes_fetched)
                 self.sizes_thread.start()
-            if not getattr(self, "micro_apps_updater", None) or not self.micro_apps_updater.isRunning():
-                self.micro_apps_updater = CheckMicroAppUpdatesThread(self)
-                self.micro_apps_updater.update_found.connect(self._on_micro_app_update_found)
-                self.micro_apps_updater.start()
+        elif manual:
+            self._update_dock_status()
+            self._refresh_sections_visibility()
 
     def show_update_dialog(self, version, description, download_url, size_mb):
         dialog = UpdateDialog(version, description, download_url, size_mb, self)
@@ -1167,9 +1252,19 @@ class HubWindow(QMainWindow):
         self.sections_layout.addStretch()
 
     def rebuild_catalog_ui(self):
-        """Reconstruye en caliente las tarjetas y secciones tras sincronizar catalog.json."""
-        self._populate_sections_content()
-        self._apply_theme()
+        """Reconstruye en caliente las tarjetas y secciones sin parpadeo y preservando el scroll."""
+        vbar = self.scroll_area.verticalScrollBar() if hasattr(self, "scroll_area") else None
+        saved_scroll = vbar.value() if vbar is not None else 0
+
+        self.scroll_content.setUpdatesEnabled(False)
+        try:
+            self._populate_sections_content()
+            self._apply_theme()
+        finally:
+            self.scroll_content.setUpdatesEnabled(True)
+
+        if vbar is not None:
+            QTimer.singleShot(0, lambda pos=saved_scroll: vbar.setValue(pos))
 
     def _open_admin_panel(self):
         SoundManager.instance().play("click")

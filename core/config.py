@@ -7,6 +7,7 @@ en GitHub Pages), caché local offline en `~/.mediahub/catalog_cache.json` y des
 """
 
 import os
+import re
 import json
 import sys
 import time
@@ -16,12 +17,13 @@ import requests
 GITHUB_REPO = "Media-Hub-Site/MediaHub-Launcher"
 ORG_NAME = "Media-Hub-Site"
 
+GIT_INFO_REFS_URL = f"https://github.com/{GITHUB_REPO}.git/info/refs?service=git-upload-pack"
 CATALOG_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/contents/catalog.json?ref=main"
 CATALOG_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/catalog.json"
 ADMIN_PANEL_URL = f"https://media-hub-site.github.io/MediaHub-Launcher/"
 
 # Fallback si aún no existe archivo de versión local ni conexión
-DEFAULT_LAUNCHER_VERSION = "v1.6.0"
+DEFAULT_LAUNCHER_VERSION = "v1.6.1"
 
 
 def get_base_dir() -> str:
@@ -520,62 +522,100 @@ def ensure_app_icon_cached(app_id: str, app_meta: dict) -> None:
             continue
 
 
-def sync_remote_catalog(timeout: float = 5.0) -> tuple[bool, int]:
+def fetch_remote_catalog_payload(timeout: float = 4.5, known_sha: str = "") -> tuple[dict | None, str]:
     """
-    Descarga la versión más reciente de `catalog.json` desde GitHub:
-    1. Primero consulta la API Contents de GitHub (`Accept: application/vnd.github.raw+json`)
-       para obtener cambios al instante sin esperar la caché CDN de 5 minutos.
-    2. Si se supera el rate limit, usa `raw.githubusercontent.com` con cache-buster.
-    Actualiza `APP_REGISTRY` in-place, descarga iconos nuevos si faltan y persiste
-    en `~/.mediahub/catalog_cache.json`.
-    Devuelve `(hubo_cambios, total_apps_visibles)`.
+    Descarga `catalog.json` desde GitHub en un hilo secundario SIN mutar `APP_REGISTRY`
+    directamente (evita condiciones de carrera entre hilos):
+    1. Consulta el endpoint Git Smart HTTP (`info/refs`) para obtener el SHA exacto del
+       último commit en `main` sin límites de rate-limit (60 req/h) y sin caché CDN.
+    2. Si el SHA coincide con `known_sha`, retorna `(None, latest_sha)` de inmediato.
+    3. Descarga `raw.githubusercontent.com/.../<latest_sha>/catalog.json` (URL inmutable sin caché viejo).
+    4. Si falla, usa `CATALOG_API_URL` y `CATALOG_RAW_URL` como respaldo.
+    5. Pre-descarga iconos nuevos a `~/.mediahub/cache/icons/` y guarda `catalog_cache.json`.
     """
-    headers_api = {
+    base_headers = {
         "User-Agent": "MediaHub-Launcher",
-        "Accept": "application/vnd.github.raw+json",
         "Cache-Control": "no-cache",
     }
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    if token:
-        headers_api["Authorization"] = f"Bearer {token}"
+    latest_sha = ""
+    try:
+        refs_resp = requests.get(GIT_INFO_REFS_URL, headers=base_headers, timeout=timeout)
+        if refs_resp.status_code == 200:
+            m = re.search(r"([0-9a-f]{40})\s+refs/heads/main", refs_resp.text)
+            if m:
+                latest_sha = m.group(1)
+    except Exception:
+        latest_sha = ""
+
+    if known_sha and latest_sha and latest_sha == known_sha:
+        return None, latest_sha
 
     catalog_data = None
-    try:
-        resp = requests.get(CATALOG_API_URL, headers=headers_api, timeout=timeout)
-        if resp.status_code == 200:
-            catalog_data = resp.json()
-    except Exception:
-        catalog_data = None
 
+    # 1. Descarga vía URL inmutable por SHA de commit (0% caché CDN, 0% rate-limit API)
+    if latest_sha:
+        try:
+            sha_raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{latest_sha}/catalog.json"
+            resp = requests.get(sha_raw_url, headers=base_headers, timeout=timeout)
+            if resp.status_code == 200:
+                catalog_data = resp.json()
+        except Exception:
+            catalog_data = None
+
+    # 2. Respaldo vía GitHub Contents API
+    if not isinstance(catalog_data, dict) or "apps" not in catalog_data:
+        headers_api = dict(base_headers)
+        headers_api["Accept"] = "application/vnd.github.raw+json"
+        token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+        if token:
+            headers_api["Authorization"] = f"Bearer {token}"
+        try:
+            resp = requests.get(CATALOG_API_URL, headers=headers_api, timeout=timeout)
+            if resp.status_code == 200:
+                catalog_data = resp.json()
+        except Exception:
+            catalog_data = None
+
+    # 3. Respaldo vía Raw main con cache-buster
     if not isinstance(catalog_data, dict) or "apps" not in catalog_data:
         try:
             bust_url = f"{CATALOG_RAW_URL}?t={int(time.time())}"
-            resp = requests.get(
-                bust_url,
-                headers={"User-Agent": "MediaHub-Launcher", "Cache-Control": "no-cache"},
-                timeout=timeout,
-            )
+            resp = requests.get(bust_url, headers=base_headers, timeout=timeout)
             if resp.status_code == 200:
                 catalog_data = resp.json()
         except Exception:
             catalog_data = None
 
     if not isinstance(catalog_data, dict) or "apps" not in catalog_data:
-        return False, len(APP_REGISTRY)
+        return None, latest_sha
 
     # Persistir en caché local para inicios futuros offline
     try:
         with open(get_cached_catalog_file(), "w", encoding="utf-8") as f:
             json.dump(catalog_data, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        print(f"Error guardando caché del catálogo: {e}")
+    except Exception:
+        pass
 
+    # Pre-descargar iconos faltantes en el hilo de fondo sin tocar APP_REGISTRY
+    raw_apps = catalog_data.get("apps", {})
+    if isinstance(raw_apps, dict):
+        for aid, ameta in list(raw_apps.items()):
+            if isinstance(ameta, dict) and ameta.get("visible", True) is not False:
+                norm = _normalize_app_entry(aid, ameta)
+                ensure_app_icon_cached(aid, norm)
+
+    return catalog_data, latest_sha
+
+
+def sync_remote_catalog(timeout: float = 5.0) -> tuple[bool, int]:
+    """
+    Sincroniza `catalog.json` y aplica los cambios a `APP_REGISTRY`.
+    (Debe invocarse desde el hilo principal o cuando no haya iteradores concurrentes).
+    """
+    catalog_data, _ = fetch_remote_catalog_payload(timeout=timeout)
+    if not isinstance(catalog_data, dict):
+        return False, len(APP_REGISTRY)
     changed = apply_catalog_dict(catalog_data)
-
-    # Descargar iconos faltantes para apps nuevas
-    for aid, ameta in list(APP_REGISTRY.items()):
-        ensure_app_icon_cached(aid, ameta)
-
     return changed, len(APP_REGISTRY)
 
 

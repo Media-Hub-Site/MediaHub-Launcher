@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T00:55:00Z",
+  "updated_at": "2026-11-19T01:55:03.110Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -205,7 +205,7 @@
       "category": "admin",
       "is_hero": false,
       "is_disabled": false,
-      "visible": true
+      "visible": false
     },
     "chile_planos": {
       "name_es": "ChilePlanos",
@@ -221,7 +221,7 @@
       "category": "admin",
       "is_hero": false,
       "is_disabled": false,
-      "visible": true
+      "visible": false
     },
     "blueguard": {
       "name_es": "BlueGuard",
@@ -237,7 +237,7 @@
       "category": "admin",
       "is_hero": false,
       "is_disabled": false,
-      "visible": true
+      "visible": false
     },
     "pokebinder": {
       "name_es": "PokeBinder Inventory",
