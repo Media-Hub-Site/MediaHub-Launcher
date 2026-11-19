@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T03:14:57.138Z",
+  "updated_at": "2026-11-19T03:15:56.675Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -88,8 +88,8 @@
       "exe": "MediaHub-SubtitleGenerator.exe",
       "dir": "MediaHub-SubtitleGenerator",
       "icon": "subtitle.png",
-      "badge_es": "IA LOCAL",
-      "badge_en": "LOCAL AI",
+      "badge_es": "EDICIÓN",
+      "badge_en": "EDITION",
       "category": "tools",
       "is_hero": false,
       "is_disabled": false,
