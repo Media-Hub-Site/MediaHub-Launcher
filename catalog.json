@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T03:12:52.030Z",
+  "updated_at": "2026-11-19T03:12:59.725Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -272,7 +272,7 @@
       "description_en": "RPG game playable to CMD",
       "badge_es": "NUEVO",
       "badge_en": "NEW",
-      "category": "tools",
+      "category": "games",
       "repo": "Media-Hub-Site/RPGTerminal",
       "exe": "RPGTerminal",
       "dir": "MediaHub-RPGTerminal",
