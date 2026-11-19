@@ -586,6 +586,7 @@
     </div>
 
     <div class="top-actions">
+      <button class="btn" onclick="openCategoriesModal()">📁 Gestionar Categorías</button>
       <button class="btn" onclick="scanOrganizationRepos()">📡 Escanear Organización GitHub</button>
       <button class="btn" onclick="openAppModal(null)">➕ Nueva App</button>
       <button class="btn" onclick="openTokenModal()" id="btnTokenStatus">🔑 Token GitHub</button>
@@ -739,6 +740,60 @@
     </div>
   </div>
 
+  <!-- Modal: Category Management -->
+  <div class="modal-backdrop" id="categoriesModalBackdrop">
+    <div class="modal" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3>📁 Administrador de Categorías / Secciones</h3>
+        <button class="btn" onclick="closeCategoriesModal()">✕</button>
+      </div>
+      <p style="font-size:0.86rem; color:var(--text-secondary); margin-bottom:16px;">
+        Crea, edita o elimina secciones del Launcher. Los cambios se sincronizan en vivo en <code>catalog.json</code>.
+      </p>
+
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; margin-bottom:18px;">
+        <h4 style="font-size:0.92rem; margin-bottom:10px;" id="catFormTitle">➕ Nueva Categoría</h4>
+        <div class="form-grid" style="grid-template-columns: 80px 1fr 1fr; gap:10px;">
+          <div class="form-group">
+            <label>Icono</label>
+            <input type="text" class="form-control" id="cat_icon" placeholder="🎯" style="text-align:center; font-size:1.1rem;" />
+          </div>
+          <div class="form-group">
+            <label>ID Categoría</label>
+            <input type="text" class="form-control" id="cat_id" placeholder="ej. ai_tools" />
+          </div>
+          <div class="form-group">
+            <label>Nombre (ES)</label>
+            <input type="text" class="form-control" id="cat_name_es" placeholder="Inteligencia Artificial" />
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>Nombre (EN)</label>
+            <input type="text" class="form-control" id="cat_name_en" placeholder="Artificial Intelligence" />
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>Descripción (ES)</label>
+            <input type="text" class="form-control" id="cat_desc_es" placeholder="Herramientas y modelos de IA generativa..." />
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>Descripción (EN)</label>
+            <input type="text" class="form-control" id="cat_desc_en" placeholder="Generative AI tools and models..." />
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+          <button class="btn" type="button" onclick="resetCategoryForm()">Cancelar Edición</button>
+          <button class="btn btn-primary" type="button" onclick="saveCategoryForm()">✓ Guardar Categoría</button>
+        </div>
+      </div>
+
+      <h4 style="font-size:0.92rem; margin-bottom:10px;">Categorías Actuales</h4>
+      <div id="categoriesList" style="display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto; padding-right:4px;"></div>
+
+      <div style="display:flex; justify-content:flex-end; margin-top:18px;">
+        <button class="btn" onclick="closeCategoriesModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: GitHub Token Configuration -->
   <div class="modal-backdrop" id="tokenModalBackdrop">
     <div class="modal" style="max-width: 520px;">
@@ -798,12 +853,181 @@
       }
     })();
 
-    const CATEGORY_NAMES = {
-      tools: "🛠️ Herramientas",
-      studio: "🎙️ Estudio & Creadores",
-      admin: "📊 Administración",
-      games: "🎮 Juegos",
-    };
+    let editingCategoryId = null;
+
+    function getCategoryMap() {
+      const map = {};
+      const sec = catalog.sections || {};
+      for (const [sid, smeta] of Object.entries(sec)) {
+        if (sid === "all" || sid === "installed") continue;
+        const icon = smeta.icon || "📁";
+        const name = smeta.name_es || smeta.name || sid;
+        map[sid] = `${icon} ${name}`;
+      }
+      return map;
+    }
+
+    function syncCategoryDropdowns() {
+      const map = getCategoryMap();
+      const catSelect = document.getElementById("f_category");
+      if (catSelect) {
+        catSelect.innerHTML = "";
+        for (const [sid, label] of Object.entries(map)) {
+          const opt = document.createElement("option");
+          opt.value = sid;
+          opt.textContent = label;
+          catSelect.appendChild(opt);
+        }
+      }
+
+      const tabsEl = document.getElementById("sectionTabs");
+      if (tabsEl) {
+        tabsEl.innerHTML = "";
+        const allBtn = document.createElement("button");
+        allBtn.className = `tab-btn ${currentFilter === "all" ? "active" : ""}`;
+        allBtn.textContent = "✦ Todas";
+        allBtn.onclick = function() { setFilterSection("all", this); };
+        tabsEl.appendChild(allBtn);
+
+        for (const [sid, label] of Object.entries(map)) {
+          const btn = document.createElement("button");
+          btn.className = `tab-btn ${currentFilter === sid ? "active" : ""}`;
+          btn.textContent = label;
+          btn.onclick = function() { setFilterSection(sid, this); };
+          tabsEl.appendChild(btn);
+        }
+
+        const hiddenBtn = document.createElement("button");
+        hiddenBtn.className = `tab-btn ${currentFilter === "hidden" ? "active" : ""}`;
+        hiddenBtn.textContent = "🔴 Ocultas";
+        hiddenBtn.onclick = function() { setFilterSection("hidden", this); };
+        tabsEl.appendChild(hiddenBtn);
+      }
+    }
+
+    function openCategoriesModal() {
+      resetCategoryForm();
+      renderCategoriesList();
+      document.getElementById("categoriesModalBackdrop").classList.add("open");
+    }
+
+    function closeCategoriesModal() {
+      document.getElementById("categoriesModalBackdrop").classList.remove("open");
+    }
+
+    function resetCategoryForm() {
+      editingCategoryId = null;
+      document.getElementById("catFormTitle").textContent = "➕ Nueva Categoría";
+      document.getElementById("cat_id").value = "";
+      document.getElementById("cat_id").readOnly = false;
+      document.getElementById("cat_icon").value = "";
+      document.getElementById("cat_name_es").value = "";
+      document.getElementById("cat_name_en").value = "";
+      document.getElementById("cat_desc_es").value = "";
+      document.getElementById("cat_desc_en").value = "";
+    }
+
+    function editCategory(sid) {
+      if (!catalog.sections || !catalog.sections[sid]) return;
+      const data = catalog.sections[sid];
+      editingCategoryId = sid;
+      document.getElementById("catFormTitle").textContent = `✏️ Editar Categoría: ${data.name_es || sid}`;
+      document.getElementById("cat_id").value = sid;
+      document.getElementById("cat_id").readOnly = true;
+      document.getElementById("cat_icon").value = data.icon || "📁";
+      document.getElementById("cat_name_es").value = data.name_es || "";
+      document.getElementById("cat_name_en").value = data.name_en || "";
+      document.getElementById("cat_desc_es").value = data.desc_es || "";
+      document.getElementById("cat_desc_en").value = data.desc_en || "";
+    }
+
+    function saveCategoryForm() {
+      const sid = document.getElementById("cat_id").value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+      if (!sid) {
+        showToast("⚠️ Ingresa un ID para la categoría.");
+        return;
+      }
+      if (sid === "all" || sid === "installed") {
+        showToast("⚠️ El ID 'all' e 'installed' están reservados por el sistema.");
+        return;
+      }
+      if (!catalog.sections) catalog.sections = {};
+
+      const isNew = !catalog.sections[sid];
+      catalog.sections[sid] = {
+        icon: document.getElementById("cat_icon").value.trim() || "📁",
+        name_es: document.getElementById("cat_name_es").value.trim() || sid,
+        name_en: document.getElementById("cat_name_en").value.trim() || document.getElementById("cat_name_es").value.trim() || sid,
+        desc_es: document.getElementById("cat_desc_es").value.trim() || "",
+        desc_en: document.getElementById("cat_desc_en").value.trim() || document.getElementById("cat_desc_es").value.trim() || "",
+      };
+
+      resetCategoryForm();
+      renderCategoriesList();
+      syncCategoryDropdowns();
+      markChanged();
+      renderCards();
+      showToast(isNew ? `✓ Categoría "${catalog.sections[sid].name_es}" creada.` : `✓ Categoría "${catalog.sections[sid].name_es}" actualizada.`);
+    }
+
+    function deleteCategory(sid) {
+      if (sid === "tools") {
+        showToast("⚠️ La categoría 'tools' es requerida por defecto como respaldo.");
+        return;
+      }
+      if (!confirm(`¿Eliminar la categoría "${sid}"? Las apps asignadas pasarán automáticamente a 'tools'.`)) return;
+
+      // Reasignar apps de esa categoría a 'tools'
+      const apps = catalog.apps || {};
+      for (const app of Object.values(apps)) {
+        if (app.category === sid) {
+          app.category = "tools";
+        }
+      }
+
+      delete catalog.sections[sid];
+      resetCategoryForm();
+      renderCategoriesList();
+      syncCategoryDropdowns();
+      markChanged();
+      renderCards();
+      showToast(`🗑️ Categoría "${sid}" eliminada.`);
+    }
+
+    function renderCategoriesList() {
+      const container = document.getElementById("categoriesList");
+      container.innerHTML = "";
+      const sec = catalog.sections || {};
+
+      for (const [sid, smeta] of Object.entries(sec)) {
+        if (sid === "all" || sid === "installed") continue;
+        const count = Object.values(catalog.apps || {}).filter(a => a.category === sid).length;
+
+        const row = document.createElement("div");
+        row.style.display = "flex";
+        row.style.alignItems = "center";
+        row.style.justifyContent = "space-between";
+        row.style.padding = "8px 12px";
+        row.style.background = "var(--bg-input)";
+        row.style.border = "1px solid var(--border)";
+        row.style.borderRadius = "var(--radius-sm)";
+        row.style.gap = "10px";
+
+        row.innerHTML = `
+          <div>
+            <span style="font-size:1.1rem; margin-right:6px;">${smeta.icon || "📁"}</span>
+            <strong>${smeta.name_es || sid}</strong>
+            <code style="margin-left:6px; font-size:0.75rem; color:var(--text-secondary);">${sid}</code>
+            <span class="badge badge-blue" style="margin-left:8px;">${count} apps</span>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn" style="padding:4px 8px; font-size:0.78rem;" onclick="editCategory('${sid}')">✏️ Editar</button>
+            <button class="btn btn-danger" style="padding:4px 8px; font-size:0.78rem;" onclick="deleteCategory('${sid}')">🗑️</button>
+          </div>
+        `;
+        container.appendChild(row);
+      }
+    }
 
     function showToast(msg, duration = 3400) {
       const el = document.getElementById("toastMsg");
@@ -858,6 +1082,7 @@
         const res = await fetch(`${CATALOG_API}?ref=main&t=${Date.now()}`, { headers, cache: "no-store" });
         if (res.ok) {
           catalog = await res.json();
+          syncCategoryDropdowns();
           renderCards();
           updateKPIs();
           return;
@@ -868,6 +1093,7 @@
         const res = await fetch(`${CATALOG_RAW}?t=${Date.now()}`, { cache: "no-store" });
         if (res.ok) {
           catalog = await res.json();
+          syncCategoryDropdowns();
           renderCards();
           updateKPIs();
           return;
@@ -928,7 +1154,8 @@
           stateBadge = `<span class="badge badge-amber">🟡 Próximamente</span>`;
         }
 
-        const catBadge = `<span class="badge badge-blue">${CATEGORY_NAMES[app.category] || app.category}</span>`;
+        const catMap = getCategoryMap();
+        const catBadge = `<span class="badge badge-blue">${catMap[app.category] || app.category}</span>`;
         const tagBadge = app.badge_es ? `<span class="badge badge-accent">${app.badge_es}</span>` : "";
 
         card.innerHTML = `
