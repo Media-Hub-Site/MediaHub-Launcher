@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T04:14:50.663Z",
+  "updated_at": "2026-11-19T04:15:02.718Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -176,7 +176,7 @@
       "visible": true
     },
     "musical_trainer": {
-      "name_es": "MusicalTrainer",
+      "name_es": "Entrenador Musical",
       "name_en": "MusicalTrainer",
       "description_es": "Conservatorio interactivo de lectura de partituras en 4 claves, armaduras, intervalos, acordes, diapasón y oído musical.",
       "description_en": "Interactive music conservatory for sight-reading across 4 clefs, key signatures, intervals, chords, fretboard and ear training.",
