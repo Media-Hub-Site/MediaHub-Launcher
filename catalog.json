@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T03:43:27.071Z",
+  "updated_at": "2026-11-19T03:43:53.108Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -236,7 +236,7 @@
       "badge_en": "SECURITY",
       "category": "admin",
       "is_hero": false,
-      "is_disabled": false,
+      "is_disabled": true,
       "visible": true
     },
     "pokebinder": {
