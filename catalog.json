@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T06:01:30.627Z",
+  "updated_at": "2026-11-20T06:01:42.293Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -205,7 +205,7 @@
       "description_en": "Financial management, expense tracking, budgets and real-time cash balance.",
       "repo": "Media-Hub-Site/GestorPresupuestario",
       "exe": "GestorPresupuestario.exe",
-      "dir": "MediaHub-GestorPresupuestario",
+      "dir": "GestorPresupuestario",
       "icon": "presupuesto.png",
       "badge_es": "FINANZAS",
       "badge_en": "FINANCE",
