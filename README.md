@@ -1,11 +1,19 @@
 # 🎛️ Media Hub — Launcher
 
-Aplicación de escritorio con diversas herramientas para su uso cotidiano, alguna vez necesitaste convertir archivos a otro formato?
-MediaHub-Launcher contiene varias aplicaciones a tu disposición con diversos tipos de conversiones multimedia, mejoras de calidad de imagen con modelos de IA y más.
+Aplicación de escritorio con diversas herramientas para su uso cotidiano, ¿alguna vez necesitaste convertir archivos a otro formato o resolver una tarea digital rápida sin complicaciones?  
+**MediaHub-Launcher** centraliza un ecosistema completo de aplicaciones independientes a tu disposición: conversiones multimedia de alto rendimiento, procesamiento con modelos de IA, utilidades de audio, gestión de documentos y herramientas de productividad.
 
 [Descargar última versión](https://github.com/Media-Hub-Site/MediaHub-Launcher/releases/latest)
 
+---
 
+## 🎯 Misión y Visión
+
+### 🚀 Misión
+Ser una solución accesible, rápida y confiable para el usuario común en momentos puntuales mediante herramientas prácticas y de alta utilidad, centralizando aplicaciones modulares e independientes en un único launcher intuitivo y eficiente.
+
+### 🌟 Visión
+Consolidarse como la suite central de referencia para cualquier persona que requiera resolver necesidades digitales cotidianas y especializadas de forma inmediata, eliminando la fricción de instalar herramientas dispersas o lidiar con software invasivo.
 
 ---
 

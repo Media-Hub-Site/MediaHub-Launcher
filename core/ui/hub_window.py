@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QGridLayout, QFrame,
     QGraphicsDropShadowEffect, QMessageBox, QApplication,
-    QMenu, QLineEdit, QScrollArea
+    QMenu, QLineEdit, QScrollArea, QProgressBar
 )
 from PyQt6.QtGui import QPixmap, QIcon, QColor, QDrag, QAction
 from PyQt6.QtCore import QMimeData, Qt, QSize, QThread, QTimer, pyqtSignal
@@ -304,6 +304,7 @@ class SyncCatalogThread(QThread):
 class CheckMicroAppUpdatesThread(QThread):
     """Verifica en segundo plano si alguna app instalada tiene una versión más nueva en GitHub."""
     update_found = pyqtSignal(str, str)  # (app_id, new_version)
+    status_changed = pyqtSignal(str)     # (status_message)
 
     def __init__(self, parent=None, apps_snapshot: dict | None = None):
         super().__init__(parent)
@@ -312,6 +313,8 @@ class CheckMicroAppUpdatesThread(QThread):
     def run(self):
         try:
             installed = load_installed_versions()
+            if installed:
+                self.status_changed.emit(t("overlay_checking_updates"))
             headers = {"User-Agent": "MediaHub-Launcher"}
             for app_id, cur_v in list(installed.items()):
                 reg = self.apps_snapshot.get(app_id)
@@ -345,6 +348,8 @@ class CheckMicroAppUpdatesThread(QThread):
                     pass
         except Exception:
             pass
+        finally:
+            self.status_changed.emit("")
 
 
 class FetchAppSizesThread(QThread):
@@ -612,6 +617,102 @@ class InstallWorker(QThread):
         curr_lang = get_current_language()
         meta = get_app_metadata(self.app_id, curr_lang)
         self.finished.emit(self.app_id, meta.get("name", reg.get("name", self.app_id)))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Overlay de Carga / Espera (Issue #89)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class LoadingBannerOverlay(QFrame):
+    """
+    Banner elegante y no invasivo en la parte inferior o central para notificar procesos
+    en segundo plano (detección de actualizaciones, instalaciones simultáneas) sin bloquear
+    la interacción del usuario ni dar sensación de congelamiento.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("loadingBannerOverlay")
+        self.setFixedHeight(54)
+        self.hide()
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(20, 8, 20, 8)
+        layout.setSpacing(14)
+
+        self.spinner_label = QLabel("⏳")
+        self.spinner_label.setStyleSheet("font-size: 16pt;")
+        layout.addWidget(self.spinner_label)
+
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(2)
+        text_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.title_label = QLabel(t("overlay_checking_updates"))
+        self.title_label.setObjectName("loadingBannerTitle")
+        self.title_label.setStyleSheet("font-weight: bold; font-size: 9.5pt;")
+
+        self.desc_label = QLabel(t("overlay_wait"))
+        self.desc_label.setObjectName("loadingBannerDesc")
+        self.desc_label.setStyleSheet("font-size: 8.5pt; opacity: 0.85;")
+
+        text_layout.addWidget(self.title_label)
+        text_layout.addWidget(self.desc_label)
+        layout.addLayout(text_layout)
+
+        layout.addStretch()
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 0)  # Modo indeterminado pulsante
+        self.progress_bar.setFixedWidth(140)
+        self.progress_bar.setFixedHeight(8)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 4px;
+                background-color: rgba(0, 0, 0, 0.25);
+            }
+            QProgressBar::chunk {
+                background-color: #6366f1;
+                border-radius: 3px;
+            }
+        """)
+        layout.addWidget(self.progress_bar)
+
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(16)
+        shadow.setColor(QColor(0, 0, 0, 100))
+        shadow.setOffset(0, 4)
+        self.setGraphicsEffect(shadow)
+
+    def apply_styles(self, is_dark: bool = True):
+        bg = "rgba(30, 30, 46, 0.96)" if is_dark else "rgba(240, 242, 248, 0.96)"
+        border = "rgba(99, 102, 241, 0.6)" if is_dark else "rgba(99, 102, 241, 0.5)"
+        text_color = "#f8fafc" if is_dark else "#0f172a"
+        sub_color = "#94a3b8" if is_dark else "#475569"
+
+        self.setStyleSheet(f"""
+            QFrame#loadingBannerOverlay {{
+                background-color: {bg};
+                border: 1px solid {border};
+                border-radius: 12px;
+            }}
+            QLabel#loadingBannerTitle {{
+                color: {text_color};
+            }}
+            QLabel#loadingBannerDesc {{
+                color: {sub_color};
+            }}
+        """)
+
+    def show_message(self, title: str, subtitle: str = ""):
+        self.title_label.setText(title)
+        self.desc_label.setText(subtitle or t("overlay_wait"))
+        self.show()
+        self.raise_()
+
+    def hide_overlay(self):
+        self.hide()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -890,6 +991,7 @@ class HubWindow(QMainWindow):
         # 2. Actualizaciones micro-apps
         self.micro_apps_updater = CheckMicroAppUpdatesThread(self, apps_snapshot=dict(APP_REGISTRY))
         self.micro_apps_updater.update_found.connect(self._on_micro_app_update_found)
+        self.micro_apps_updater.status_changed.connect(self._on_update_check_status_changed)
         self.micro_apps_updater.start()
 
         # 3. Consulta de tamaño de cada aplicación (Issue #4)
@@ -954,6 +1056,47 @@ class HubWindow(QMainWindow):
         # Si la versión local es menor o coincide, actualizamos el header
         curr = get_launcher_version()
         self.subtitle_label.setText(t("app_subtitle", version=curr))
+
+    def _on_update_check_status_changed(self, msg: str):
+        if not hasattr(self, "loading_banner"):
+            return
+        if msg:
+            self._is_checking_updates = True
+            self.loading_banner.show_message(msg, t("overlay_wait"))
+            self._reposition_loading_banner()
+        else:
+            self._is_checking_updates = False
+            self._update_loading_banner_visibility()
+
+    def _update_loading_banner_visibility(self):
+        if not hasattr(self, "loading_banner"):
+            return
+        workers_count = len(self._workers)
+        if workers_count >= 2:
+            self.loading_banner.show_message(
+                t("overlay_installing_multiple", count=workers_count),
+                t("overlay_wait")
+            )
+            self._reposition_loading_banner()
+        elif getattr(self, "_is_checking_updates", False):
+            self.loading_banner.show_message(t("overlay_checking_updates"), t("overlay_wait"))
+            self._reposition_loading_banner()
+        else:
+            self.loading_banner.hide_overlay()
+
+    def _reposition_loading_banner(self):
+        if hasattr(self, "loading_banner") and self.loading_banner.isVisible():
+            w = min(620, self.width() - 80)
+            h = 54
+            x = (self.width() - w) // 2
+            # Ubicar arriba del dock footer con margen
+            y = self.height() - h - 55
+            self.loading_banner.setGeometry(x, y, w, h)
+            self.loading_banner.raise_()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reposition_loading_banner()
 
     def _on_micro_app_update_found(self, app_id: str, new_version: str):
         card = self._card_dict.get(app_id)
@@ -1110,6 +1253,10 @@ class HubWindow(QMainWindow):
         dock_layout.addWidget(self.dock_folder_btn)
 
         main_layout.addWidget(self.footer_dock)
+
+        # Overlay flotante de Carga / Espera (Issue #89)
+        self.loading_banner = LoadingBannerOverlay(central_widget)
+
         self._update_dock_status()
         self._refresh_sections_visibility()
 
@@ -1530,6 +1677,7 @@ class HubWindow(QMainWindow):
         worker.finished.connect(self._on_install_done)
         worker.error.connect(lambda err: self._on_install_error(app_id, err))
         self._workers[app_id] = worker
+        self._update_loading_banner_visibility()
         worker.start()
 
     def _on_install_progress(self, app_id: str, pct: int, msg: str):
@@ -1540,6 +1688,7 @@ class HubWindow(QMainWindow):
     def _on_install_done(self, app_id: str, name: str):
         SoundManager.instance().play("success")
         self._workers.pop(app_id, None)
+        self._update_loading_banner_visibility()
         card = self._card_dict.get(app_id)
         if card:
             card._pending_update_version = None
@@ -1573,6 +1722,7 @@ class HubWindow(QMainWindow):
 
     def _on_install_error(self, app_id: str, err: str):
         self._workers.pop(app_id, None)
+        self._update_loading_banner_visibility()
         card = self._card_dict.get(app_id)
         if card:
             card.refresh_state()
@@ -1785,6 +1935,9 @@ class HubWindow(QMainWindow):
 
         self._update_dock_status()
         self._refresh_sections_visibility()
+
+        if hasattr(self, "loading_banner"):
+            self.loading_banner.apply_styles(is_dark=self._tm.is_dark)
 
         for card in self._card_dict.values():
             card.update_texts()
