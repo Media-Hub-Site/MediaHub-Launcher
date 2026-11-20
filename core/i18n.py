@@ -82,6 +82,9 @@ STRINGS = {
         "btn_syncing": "⏳ Sincronizando…",
         "dock_admin_panel": "⚙️ Panel Admin Web",
         "dock_admin_panel_tooltip": "Abrir el administrador web de tarjetas de Media Hub en GitHub Pages",
+        "overlay_checking_updates": "Comprobando actualizaciones de las aplicaciones...",
+        "overlay_installing_multiple": "Instalando y configurando aplicaciones ({count} en progreso)...",
+        "overlay_wait": "Por favor, espera un momento",
     },
     "en": {
         "app_title": "Media Hub",
@@ -147,6 +150,9 @@ STRINGS = {
         "btn_syncing": "⏳ Syncing…",
         "dock_admin_panel": "⚙️ Web Admin Panel",
         "dock_admin_panel_tooltip": "Open Media Hub's web card manager on GitHub Pages",
+        "overlay_checking_updates": "Checking for application updates...",
+        "overlay_installing_multiple": "Installing and configuring applications ({count} in progress)...",
+        "overlay_wait": "Please wait a moment",
     }
 }
 
