@@ -256,11 +256,22 @@ def launch_app(app_id: str):
             env["LANG"] = f"{app_lang}_ES.UTF-8" if app_lang == "es" else f"{app_lang}_US.UTF-8"
 
             # Iniciar como proceso desacoplado pasando --lang y variables de entorno
+            # Si la aplicación es de consola/terminal (ej: juegos CLI), se debe asignar una ventana de consola propia (CREATE_NEW_CONSOLE)
+            is_cli_app = reg.get("category") == "games" or reg.get("is_console", False)
+
+            if os.name == "nt":
+                if is_cli_app:
+                    cflags = subprocess.CREATE_NEW_CONSOLE
+                else:
+                    cflags = subprocess.DETACHED_PROCESS
+            else:
+                cflags = 0
+
             subprocess.Popen(
                 [exe, f"--lang={app_lang}"],
                 cwd=os.path.dirname(exe),
                 env=env,
-                creationflags=subprocess.DETACHED_PROCESS if os.name == "nt" else 0,
+                creationflags=cflags,
                 close_fds=True
             )
         except Exception as e:

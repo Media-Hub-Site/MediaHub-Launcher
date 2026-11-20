@@ -280,6 +280,7 @@
       "badge_es": "NUEVO",
       "badge_en": "NEW",
       "category": "games",
+      "is_console": true,
       "repo": "Media-Hub-Site/RPGTerminal",
       "exe": "RPGTerminal.exe",
       "dir": "MediaHub-RPGTerminal",
