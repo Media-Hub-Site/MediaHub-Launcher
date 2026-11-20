@@ -285,7 +285,7 @@
       "dir": "MediaHub-RPGTerminal",
       "icon": "rpgterminal.png",
       "visible": true,
-      "is_disabled": true,
+      "is_disabled": false,
       "is_hero": false
     },
     "musical_midi": {
