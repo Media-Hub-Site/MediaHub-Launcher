@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T06:02:43.355Z",
+  "updated_at": "2026-11-20T06:02:45.594Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -237,7 +237,7 @@
       "description_en": "Real-time Blue Team cybersecurity assistant for network, ports and system logs.",
       "repo": "Media-Hub-Site/BlueGuard",
       "exe": "BlueGuard.exe",
-      "dir": "BlueGuard",
+      "dir": "MediaHub-BlueGuard",
       "icon": "blueguard.png",
       "badge_es": "SEGURIDAD",
       "badge_en": "SECURITY",
