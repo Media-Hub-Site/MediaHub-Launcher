@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T06:02:29.234Z",
+  "updated_at": "2026-11-20T06:02:32.493Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -141,7 +141,7 @@
       "description_en": "Editorial Unicode typography studio, invisible characters, rare symbols, frames and emojis.",
       "repo": "Media-Hub-Site/FontFamily",
       "exe": "FontFamily.exe",
-      "dir": "FontFamily",
+      "dir": "MediaHub-FontFamily",
       "icon": "fontfamily.png",
       "badge_es": "TIPOGRAFÍA",
       "badge_en": "TYPOGRAPHY",
