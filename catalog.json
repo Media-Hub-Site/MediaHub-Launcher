@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T06:02:13.914Z",
+  "updated_at": "2026-11-20T06:02:23.778Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -93,7 +93,7 @@
       "description_en": "Automatic subtitle transcription and burning with Whisper AI locally.",
       "repo": "Media-Hub-Site/SubtitleGenerator",
       "exe": "MediaHub-SubtitleGenerator.exe",
-      "dir": "SubtitleGenerator",
+      "dir": "MediaHub-SubtitleGenerator",
       "icon": "subtitle.png",
       "badge_es": "EDICIÓN",
       "badge_en": "EDITION",
