@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T06:02:05.410Z",
+  "updated_at": "2026-11-20T06:02:08.365Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -109,7 +109,7 @@
       "description_en": "Intelligent conversion between PDF, Word, Excel, PowerPoint and images at 300 DPI.",
       "repo": "Media-Hub-Site/DocumentConverter",
       "exe": "MediaHub-DocumentConverter.exe",
-      "dir": "MediaHub-DocumentConverter",
+      "dir": "DocumentConverter",
       "icon": "docs.png",
       "badge_es": "OFICINA",
       "badge_en": "OFFICE",
