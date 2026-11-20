@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T06:01:47.467Z",
+  "updated_at": "2026-11-20T06:01:58.627Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -189,7 +189,7 @@
       "description_en": "Interactive music conservatory for sight-reading across 4 clefs, key signatures, intervals, chords, fretboard and ear training.",
       "repo": "Media-Hub-Site/MusicalTrainer",
       "exe": "MusicalTrainer.exe",
-      "dir": "MediaHub-MusicalTrainer",
+      "dir": "MusicalTrainer",
       "icon": "musicaltrainer.png",
       "badge_es": "CONSERVATORIO",
       "badge_en": "CONSERVATORY",
