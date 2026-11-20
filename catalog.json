@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T06:02:02.603Z",
+  "updated_at": "2026-11-20T06:02:05.410Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -125,7 +125,7 @@
       "description_en": "Batch downloader from YouTube, TikTok, Instagram and playlists with parallel support.",
       "repo": "Media-Hub-Site/LinkConverter",
       "exe": "MediaHub-LinkConverter.exe",
-      "dir": "MediaHub-LinkConverter",
+      "dir": "LinkConverter",
       "icon": "link_converter.webp",
       "badge_es": "DESCARGA",
       "badge_en": "DOWNLOAD",
