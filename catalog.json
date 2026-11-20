@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T21:57:59.660Z",
+  "updated_at": "2026-11-20T21:58:32.312Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -317,7 +317,7 @@
       "exe": "PCleaner.exe",
       "dir": "MediaHub-PCleaner",
       "icon": "pcleaner.png",
-      "visible": true,
+      "visible": false,
       "is_disabled": true,
       "is_hero": false
     }
