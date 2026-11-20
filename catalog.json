@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T06:02:45.594Z",
+  "updated_at": "2026-11-20T06:02:48.001Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -298,7 +298,7 @@
       "category": "studio",
       "repo": "Media-Hub-Site/MusicalMIDI",
       "exe": "MusicalMIDI.exe",
-      "dir": "MusicalMIDI",
+      "dir": "MediaHub-MusicalMIDI",
       "icon": "musicalmidi.png",
       "visible": true,
       "is_disabled": true,
