@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T06:02:41.305Z",
+  "updated_at": "2026-11-20T06:02:43.355Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -221,7 +221,7 @@
       "description_en": "Technical planimetry and architectural hub for students and professionals.",
       "repo": "Media-Hub-Site/ChilePlanos",
       "exe": "ChilePlanos.exe",
-      "dir": "ChilePlanos",
+      "dir": "MediaHub-ChilePlanos",
       "icon": "chileplanos.png",
       "badge_es": "PLANOS",
       "badge_en": "BLUEPRINTS",
