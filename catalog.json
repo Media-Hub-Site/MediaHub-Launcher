@@ -264,7 +264,7 @@
       "extra_assets": [
         {
           "name": "images.zip",
-          "tag": "",
+          "tag": "assets-v1",
           "target_subdir": "assets",
           "extract": true,
           "description_es": "imágenes de cartas TCG",
