@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T06:02:50.226Z",
+  "updated_at": "2026-11-20T06:02:52.065Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -253,7 +253,7 @@
       "description_en": "Visual Pokémon TCG binder organizer, card pricing, decks and inventory tracker.",
       "repo": "Media-Hub-Site/PokeBinderInventory",
       "exe": "PokeBinder.exe",
-      "dir": "PokeBinder",
+      "dir": "MediaHub-PokeBinder",
       "icon": "pokebinder.png",
       "badge_es": "TCG BINDER",
       "badge_en": "TCG BINDER",
