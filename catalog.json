@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-19T06:47:06.902Z",
+  "updated_at": "2026-11-20T06:00:50.956Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -302,6 +302,22 @@
       "icon": "musicalmidi.png",
       "visible": true,
       "is_disabled": true,
+      "is_hero": false
+    },
+    "pcleaner": {
+      "name_es": "PCleaner",
+      "name_en": "PCleaner",
+      "description_es": "Limpiador y liberador de espacio en tu computadora de forma segura y eficiente",
+      "description_en": "Cleans and frees up space on your computer safely and efficiently",
+      "badge_es": "NUEVO",
+      "badge_en": "NEW",
+      "category": "admin",
+      "repo": "Media-Hub-Site/PCleaner",
+      "exe": "PCleaner",
+      "dir": "PCleaner",
+      "icon": "pcleaner.png",
+      "visible": true,
+      "is_disabled": false,
       "is_hero": false
     }
   }
