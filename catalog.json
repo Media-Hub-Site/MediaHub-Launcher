@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T21:59:04.557Z",
+  "updated_at": "2026-11-21T07:49:18.700Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -317,6 +317,22 @@
       "exe": "PCleaner.exe",
       "dir": "MediaHub-PCleaner",
       "icon": "pcleaner.png",
+      "visible": true,
+      "is_disabled": false,
+      "is_hero": false
+    },
+    "cyberdeck": {
+      "name_es": "Cubierta Cibernética",
+      "name_en": "CyberDeck",
+      "description_es": "Juego de puzzles ciberneticos simples para la diversión inmediata",
+      "description_en": "Simple cyber puzzle game for instant fun",
+      "badge_es": "Puzzle",
+      "badge_en": "Cyber",
+      "category": "games",
+      "repo": "Media-Hub-Site/CyberDeck",
+      "exe": "CyberDeck.exe",
+      "dir": "MediaHub-CyberDeck",
+      "icon": "cyberdeck.png",
       "visible": true,
       "is_disabled": false,
       "is_hero": false
