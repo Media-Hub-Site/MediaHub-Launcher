@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-21T07:49:18.700Z",
+  "updated_at": "2026-11-21T07:50:39.307Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -326,8 +326,8 @@
       "name_en": "CyberDeck",
       "description_es": "Juego de puzzles ciberneticos simples para la diversión inmediata",
       "description_en": "Simple cyber puzzle game for instant fun",
-      "badge_es": "Puzzle",
-      "badge_en": "Cyber",
+      "badge_es": "PUZZLE",
+      "badge_en": "PUZZLE",
       "category": "games",
       "repo": "Media-Hub-Site/CyberDeck",
       "exe": "CyberDeck.exe",
