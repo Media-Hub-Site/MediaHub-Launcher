@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-21T07:50:39.307Z",
+  "updated_at": "2026-11-21T07:50:49.931Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -277,8 +277,8 @@
       "name_en": "RPG Terminal",
       "description_es": "Juego RPG jugable desde la Terminal CMD",
       "description_en": "RPG game playable to CMD",
-      "badge_es": "NUEVO",
-      "badge_en": "NEW",
+      "badge_es": "RPG",
+      "badge_en": "RPG",
       "category": "games",
       "is_console": true,
       "repo": "Media-Hub-Site/RPGTerminal",
