@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-21T07:50:59.306Z",
+  "updated_at": "2026-11-25T00:28:45.356Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -333,6 +333,22 @@
       "exe": "CyberDeck.exe",
       "dir": "MediaHub-CyberDeck",
       "icon": "cyberdeck.png",
+      "visible": true,
+      "is_disabled": false,
+      "is_hero": false
+    },
+    "pixelavity": {
+      "name_es": "Pixelavity",
+      "name_en": "Pixelavity",
+      "description_es": "Extensión de Antigravity para ver tus agentes trabajando de forma local en tu computador",
+      "description_en": "Antigravity extension to view your agents working locally on your computer",
+      "badge_es": "EXTENSION",
+      "badge_en": "EXTENSION",
+      "category": "admin",
+      "repo": "Media-Hub-Site/Pixelavity",
+      "exe": "Pixelavity.exe",
+      "dir": "MediaHub-Pixelavity",
+      "icon": "pixelavity.png",
       "visible": true,
       "is_disabled": false,
       "is_hero": false
