@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-25T00:28:45.356Z",
+  "updated_at": "2026-11-25T21:04:38.950Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -346,7 +346,7 @@
       "badge_en": "EXTENSION",
       "category": "admin",
       "repo": "Media-Hub-Site/Pixelavity",
-      "exe": "Pixelavity.exe",
+      "exe": "Pixelavity",
       "dir": "MediaHub-Pixelavity",
       "icon": "pixelavity.png",
       "visible": true,
