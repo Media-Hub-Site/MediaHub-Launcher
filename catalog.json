@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-25T22:19:34.340Z",
+  "updated_at": "2026-11-28T04:03:17.645Z",
   "org_name": "Media-Hub-Site",
   "sections": {
     "all": {
@@ -310,8 +310,8 @@
       "name_en": "PCleaner",
       "description_es": "Limpiador y liberador de espacio en tu computadora de forma segura y eficiente",
       "description_en": "Cleans and frees up space on your computer safely and efficiently",
-      "badge_es": "NUEVO",
-      "badge_en": "NEW",
+      "badge_es": "LIMPIADOR",
+      "badge_en": "CLEANER",
       "category": "admin",
       "repo": "Media-Hub-Site/PCleaner",
       "exe": "PCleaner.exe",
